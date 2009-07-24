@@ -47,7 +47,7 @@ FILE* input = NULL;
 void cleanup() 
 {
 	if(serial > 0) {
-		close(serial);
+		serial_close(serial);
 	}
 	if(input != NULL && input != stdin) {
 		fclose(input);
