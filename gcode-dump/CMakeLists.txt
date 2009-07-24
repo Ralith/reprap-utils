@@ -3,3 +3,5 @@ add_executable(rru-gcode-dump
   )
 
 target_link_libraries(rru-gcode-dump rru-common)
+
+install(TARGETS rru-gcode-dump DESTINATION bin)
