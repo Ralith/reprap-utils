@@ -1,6 +1,3 @@
-#include "../common/serial.h"
-#include "../common/handlesigs.h"
-
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -10,6 +7,9 @@
 #include <string.h>
 #include <getopt.h>
 #include <poll.h>
+
+#include "../common/serial.h"
+#include "../common/handlesigs.h"
 
 #define _STR(x) #x
 #define STR(x) _STR(x)
