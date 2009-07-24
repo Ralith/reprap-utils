@@ -1,0 +1,1 @@
+On any sufficiently POSIX-compatible system: cmake . && make
