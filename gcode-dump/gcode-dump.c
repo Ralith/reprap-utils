@@ -64,6 +64,7 @@ int main(int argc, char** argv)
 	char *filepath = NULL;
 	int noisy = 1;
 	int verbose = 0;
+	int interactive = isatty(STDIN_FILENO);
 	{
 		int opt;
 		while ((opt = getopt(argc, argv, "h?qvs:")) >= 0) {
@@ -130,7 +131,11 @@ int main(int argc, char** argv)
 
 	if(strncmp("-", filepath, 1) == 0) {
 		if(noisy) {
-			printf("Reading gcode from standard input; enter Ctrl-D (EOF) to finish.\n");
+			printf("Reading gcode from standard input");
+			if(interactive) {
+				printf(", enter Ctrl-D (EOF) to finish.");
+			}
+			printf("\n");
 		}
 		input = stdin;
 	} else {
@@ -139,6 +144,7 @@ int main(int argc, char** argv)
 			fprintf(stderr, "Unable to open gcode file \"%s\": %s\n", filepath, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
+		interactive = 0;
 	}
 
 	int timeout;
@@ -150,12 +156,14 @@ int main(int argc, char** argv)
 	int ret, msg_confirmed;
 	int charsfound;				/* N chars of CONFIRM_MSG found. */
 	ssize_t len;
-	if(isatty(STDIN_FILENO)) {
+
+	if(verbose || interactive) {
 		printf(PROMPT);
 	}
+	
 	while(fgets(readbuf, sizeof(readbuf), input)) {
 		len = strlen(readbuf);
-		if(verbose && !isatty(STDIN_FILENO)) {
+		if(verbose && !interactive) {
 			printf("%s", readbuf);
 		}
 		
@@ -226,9 +234,12 @@ int main(int argc, char** argv)
 			}
 		}
 
-		if(isatty(STDIN_FILENO)) {
+		if(verbose || interactive) {
 			printf(PROMPT);
 		}
+	}
+	if(verbose || interactive) {
+		printf("\n");
 	}
 
 	if(noisy) {
