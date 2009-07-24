@@ -24,7 +24,7 @@
 
 #define DEFAULT_SPEED 19200
 #define BUFFER_SIZE 128
-#define TIMEOUT_MSECS 5000
+#define TIMEOUT_MSECS (30 * 1000)
 #define CONFIRM_MSG "ok\r\n"
 #define PROMPT "> "
 
