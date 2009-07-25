@@ -167,7 +167,7 @@ int main(int argc, const char **argv)
 			switch(rc) {
 			case 's':
 				if(!isnum(arg)) {
-					fprintf(stderr, "Speed requires a numeric argument!");
+					fprintf(stderr, "Speed requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
 				gcode_append(&tail, asprintfx("G1 F%s", arg));
@@ -179,11 +179,11 @@ int main(int argc, const char **argv)
 				coords = decodeCoords(arg);
 				
 				if(coords == NULL) {
-					fprintf(stderr, "Invalid coordinate formatting.");
+					fprintf(stderr, "Invalid coordinate formatting.\n");
 					exit(EXIT_FAILURE);
 				}
 				if(strcmp(coords, "") == 0) {
-					fprintf(stderr, "Must specify at least one movement.");
+					fprintf(stderr, "Rapid movement requires at least one movement.\n");
 					exit(EXIT_FAILURE);
 				}
 
@@ -198,11 +198,11 @@ int main(int argc, const char **argv)
 				coords = decodeCoords(arg);
 				
 				if(coords == NULL) {
-					fprintf(stderr, "Invalid coordinate formatting.");
+					fprintf(stderr, "Invalid coordinate formatting.\n");
 					exit(EXIT_FAILURE);
 				}
 				if(strcmp(coords, "") == 0) {
-					fprintf(stderr, "Must specify at least one movement.");
+					fprintf(stderr, "Linear movement requires at least one movement.\n");
 					exit(EXIT_FAILURE);
 				}
 				
@@ -213,7 +213,7 @@ int main(int argc, const char **argv)
 
 			case 'd':
 				if(!isnum(arg)) {
-					fprintf(stderr, "Dwell requires a numeric argument!");
+					fprintf(stderr, "Dwell requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
 				gcode_append(&tail, asprintfx("G4 P%s", arg));
@@ -243,14 +243,14 @@ int main(int argc, const char **argv)
 				} else if(strcasecmp(arg, "off")) {
 					gcode_append(&tail, "M103");
 				} else {
-					fprintf(stderr, "Argument to extrude must be one of on, reverse, or off.");
+					fprintf(stderr, "Argument to extrude must be one of on, reverse, or off.\n");
 					exit(EXIT_FAILURE);
 				}
 				break;
 
 			case 't':
 				if(!isnum(arg)) {
-					fprintf(stderr, "Extruder temperature requires a numeric argument!");
+					fprintf(stderr, "Extruder temperature requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
 				gcode_append(&tail, asprintfx("M104 S%s", arg));
@@ -259,7 +259,7 @@ int main(int argc, const char **argv)
 			case 'f':
 			{
 				if(!isnum(arg)) {
-					fprintf(stderr, "Extruder flowrate requires a numeric argument!");
+					fprintf(stderr, "Extruder flowrate requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
 				gcode_append(&tail, asprintfx("M108 S%s", arg));
@@ -287,7 +287,7 @@ int main(int argc, const char **argv)
 				}
 				
 				if(!(dox || doy || doz)) {
-					fprintf(stderr, "Must specify at least one of x, y, or z to be zeroed!");
+					fprintf(stderr, "Must specify at least one of x, y, or z to be zeroed!\n");
 					exit(EXIT_FAILURE);
 				}
 
