@@ -5,7 +5,6 @@
 
 #include <popt.h>
 
-#include "../common/serial.h"
 #include "../common/handlesigs.h"
 #include "../common/asprintfx.h"
 
@@ -113,13 +112,16 @@ int main(int argc, const char **argv)
 	/* Get options */
 	long speed = DEFAULT_SPEED;
 	char *devpath = NULL;
-	int verbose = 0;
+	char verbose = 0;
+	char pretending = 0;
 	{
 		poptContext ctx;
 
 		struct poptOption options_table[] = {
 			{"linespeed", NULL, POPT_ARG_LONG, &speed, 0,
 			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
+			{"pretend", NULL, POPT_ARG_VAL, &pretending, 1,
+			 "Output gcode instead of sending it to the machine.", NULL},
 
 			{"speed", 's', POPT_ARG_INT, NULL, 's',
 			 "Set movement speed.", "speed"},
@@ -320,20 +322,26 @@ int main(int argc, const char **argv)
 			poptPrintUsage(ctx, stderr, 0);
 			exit(EXIT_FAILURE);
 		}
-	}
 
-	{
-		gcode_cmd *i;
-		for(i = head; i != NULL; i = i->next) {
-			printf("GCODE: %s\n", i->command);
+		if (rc < 0) {
+			/* An error occurred during option processing */
+			fprintf(stderr, "%s: %s\n",
+					poptBadOption(ctx, POPT_BADOPTION_NOALIAS),
+					poptStrerror(rc));
+			exit(EXIT_FAILURE);
 		}
 	}
 
-	int serial = serial_open(devpath, speed);
-	if(serial < 0) {
-		fprintf(stderr, "Error opening serial device: %s\n", serial_strerror(serial));
-		exit(EXIT_FAILURE);
+	FILE *output = (pretending ? stdout : popen("rru-gcode-dump", "w"));
+
+	gcode_cmd *current = head;
+	while(current != NULL) {
+		fwrite(current->command, sizeof(char), strlen(current->command), output);
+		fwrite("\r\n", sizeof(char), 2, output);
 	}
 
-	serial_close(serial);
+	if(output != stdout) {
+		exit(pclose(output));
+	}
+	exit(EXIT_SUCCESS);
 }
