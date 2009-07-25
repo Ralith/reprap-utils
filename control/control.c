@@ -82,6 +82,25 @@ char* decodeCoords(char *coord)
 	return ret;
 }
 
+int isnum(char *str) 
+{
+	size_t i;
+	int points = 0;
+	for(i = 0; i < strlen(str); i++) {
+		if((str[i] > '9' || str[i] < '0')) {
+			if(str[i] == '.') {
+				/* Only one '.' allowed */
+				if(points++ > 1) {
+					return 0;
+				}
+			} else {
+				return 0;
+			}
+		}	
+	}
+	return 1;
+}
+
 int main(int argc, const char **argv) 
 {
 	init_sig_handling();
@@ -120,7 +139,7 @@ int main(int argc, const char **argv)
 			 "Use relative/incremental coordinates (G91).", NULL},
 			
 			{"extrude", 'e', POPT_ARG_STRING, NULL, 'e',
-			 "Set extruder motor state (M101/M103).", "on|off|reverse"},
+			 "Set extruder motor state (M101/M102/M103).", "on|reverse|off"},
 			{"temp", 't', POPT_ARG_INT, NULL, 't',
 			 "Set extrusion temperature in Celsius (M104).", "temperature"},
 			{"flowrate", 'f', POPT_ARG_INT, NULL, 'f',
@@ -147,6 +166,10 @@ int main(int argc, const char **argv)
 			arg = poptGetOptArg(ctx);
 			switch(rc) {
 			case 's':
+				if(!isnum(arg)) {
+					fprintf(stderr, "Speed requires a numeric argument!");
+					exit(EXIT_FAILURE);
+				}
 				gcode_append(&tail, asprintfx("G1 F%s", arg));
 				break;
 
@@ -154,13 +177,121 @@ int main(int argc, const char **argv)
 			{
 				static char *coords;
 				coords = decodeCoords(arg);
-				if(coords) {
-					gcode_append(&tail, asprintfx("G0 %s", coords));
+				if(coords == NULL) {
+					fprintf(stderr, "Invalid coordinate formatting.");
+					exit(EXIT_FAILURE);
 				}
+				gcode_append(&tail, asprintfx("G0 %s", coords));
 				free(coords);
 				break;
 			}
-			
+
+			case 'l':
+			{
+				static char *coords;
+				coords = decodeCoords(arg);
+				if(coords == NULL) {
+					fprintf(stderr, "Invalid coordinate formatting.");
+					exit(EXIT_FAILURE);
+				}
+				gcode_append(&tail, asprintfx("G1 %s", coords));
+				free(coords);
+				break;
+			}
+
+			case 'd':
+				if(!isnum(arg)) {
+					fprintf(stderr, "Dwell requires a numeric argument!");
+					exit(EXIT_FAILURE);
+				}
+				gcode_append(&tail, asprintfx("G4 P%s", arg));
+				break;
+
+			case 'i':
+				gcode_append(&tail, "G20");
+				break;
+
+			case 'm':
+				gcode_append(&tail, "G21");
+				break;
+
+			case 'a':
+				gcode_append(&tail, "G90");
+				break;
+
+			case 'r':
+				gcode_append(&tail, "G91");
+				break;
+
+			case 'e':
+				if(strcasecmp(arg, "on") == 0) {
+					gcode_append(&tail, "M101");
+				} else if(strcasecmp(arg, "reverse")) {
+					gcode_append(&tail, "M102");
+				} else if(strcasecmp(arg, "off")) {
+					gcode_append(&tail, "M103");
+				} else {
+					fprintf(stderr, "Argument to extrude must be one of on, reverse, or off.");
+					exit(EXIT_FAILURE);
+				}
+				break;
+
+			case 't':
+				if(!isnum(arg)) {
+					fprintf(stderr, "Extruder temperature requires a numeric argument!");
+					exit(EXIT_FAILURE);
+				}
+				gcode_append(&tail, asprintfx("M104 S%s", arg));
+				break;
+
+			case 'f':
+			{
+				if(!isnum(arg)) {
+					fprintf(stderr, "Extruder flowrate requires a numeric argument!");
+					exit(EXIT_FAILURE);
+				}
+				gcode_append(&tail, asprintfx("M108 S%s", arg));
+				break;
+			}
+
+			case 'z':
+			{
+				static char dox, doy, doz;
+				dox = 0;
+				doy = 0;
+				doz = 0;
+
+				static size_t i;
+				for(i = 0; i < strlen(arg); i++) {
+					if(arg[i] == 'x' || arg[i] == 'X') {
+						dox = 1;
+					}
+					if(arg[i] == 'y' || arg[i] == 'Y') {
+						doy = 1;
+					}
+					if(arg[i] == 'z' || arg[i] == 'Z') {
+						doz = 1;
+					}
+				}
+				
+				if(!(dox || doy || doz)) {
+					fprintf(stderr, "Must specify at least one of x, y, or z to be zeroed!");
+					exit(EXIT_FAILURE);
+				}
+
+				/* Move to minimum */
+				gcode_append(&tail, asprintfx("G1 %s%s%s",
+											  (dox ? "X-999 " : ""),
+											  (doy ? "Y-999 " : ""),
+											  (doz ? "Z-999" : "")));
+				/* Set as zero */
+				gcode_append(&tail, asprintfx("G92 %s%s%s",
+											  (dox ? "X0 " : ""),
+											  (doy ? "Y0 " : ""),
+											  (doz ? "Z0" : "")));
+				break;
+			}
+				
 				
 			default:
 				break;
