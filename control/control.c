@@ -42,12 +42,14 @@ void gcode_append(gcode_cmd **tail, char *new)
 
 char* decodeCoords(char *coord) 
 {
-	char *explicit = calloc(strlen(coord)+3, sizeof(char));
+	size_t clen = strlen(coord);
+	char *explicit = calloc(clen+3, sizeof(char));
 	size_t write, i;
 	char last = '\0';
 	int blanks = 0;
-	for(i = 0, write = 0; i < strlen(explicit); i++) {
-		if(coord[i] == ':' && last == ':') {
+	for(i = 0, write = 0; i < strlen(coord); i++) {
+		if((i == 0 && coord[i] == ':') ||
+		   (last == ':' && coord[i] == ':')) {
 			blanks++;
 			if(blanks > 2) {
 				/* Invalid arg or no coords set */
@@ -55,16 +57,23 @@ char* decodeCoords(char *coord)
 			}
 			explicit[write++] = '_';
 		}
+			
 		explicit[write++] = coord[i];
 		last = coord[i];
+		printf("Parsing %c\n", coord[i]);
 	}
+	if(explicit[write-1] == ':') {
+		explicit[write++] = '_';
+	}
+	explicit[write++] = '\0';
+	printf("Explicit: %s\n", explicit);
 
 	char *ret = calloc(strlen(coord)+3, sizeof(char));
 	char *tok = strtok(explicit, ":");
 	i = 0;
 	do {
 		if(strcmp("_", tok) != 0) {
-			strcat(ret, &("XYZ"[i]));
+			strcat(ret, &("X\0Y\0Z\0"[i*2]));
 			strcat(ret, tok);
 			strcat(ret, " ");
 		}
