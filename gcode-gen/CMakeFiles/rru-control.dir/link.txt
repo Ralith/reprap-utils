@@ -1,0 +1,1 @@
+/usr/bin/gcc  -g  -fPIC CMakeFiles/rru-control.dir/control.o  -o rru-control -rdynamic -L/home/ralith/dev/reprap-utils/common ../common/librru-common.a -lpopt 

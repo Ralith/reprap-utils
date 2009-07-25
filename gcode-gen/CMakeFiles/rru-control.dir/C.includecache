@@ -1,0 +1,28 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/ralith/dev/reprap-utils/control/../common/asprintfx.h
+
+/home/ralith/dev/reprap-utils/control/../common/handlesigs.h
+
+/home/ralith/dev/reprap-utils/control/control.c
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+assert.h
+-
+getopt.h
+-
+../common/handlesigs.h
+/home/ralith/dev/reprap-utils/control/../common/handlesigs.h
+../common/asprintfx.h
+/home/ralith/dev/reprap-utils/control/../common/asprintfx.h
+
