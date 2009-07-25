@@ -61,7 +61,7 @@ int main(int argc, const char** argv)
 		};
 
 		ctx = poptGetContext(NULL, argc, argv, options_table, 0);
-		poptSetOtherOptionHelp(ctx, "[OPTIONS]* <serial device>");
+		poptSetOtherOptionHelp(ctx, "<serial device>");
 
 		if (argc < 2) {
 			poptPrintUsage(ctx, stderr, 0);
