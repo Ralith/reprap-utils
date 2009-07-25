@@ -287,7 +287,7 @@ int main(int argc, const char **argv)
 				}
 				
 				if(!(dox || doy || doz)) {
-					fprintf(stderr, "Must specify at least one of x, y, or z to be zeroed!\n");
+					fprintf(stderr, "Must specify at least one of the x, y, or z axes to be zeroed!\n");
 					exit(EXIT_FAILURE);
 				}
 
