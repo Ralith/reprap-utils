@@ -1,5 +1,7 @@
 All code contained within this project is made available under the BSD license detailed in LICENSE.
 
+Detailed information about the functionality of any tool can be obtained by calling it with -h (e.g. `rru-gcode-gen -h`).
+
 ==============
 rru-gcode-dump
 ==============
