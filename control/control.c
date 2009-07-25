@@ -100,7 +100,7 @@ int main(int argc, const char **argv)
 			{"rapid", 'p', POPT_ARG_STRING, NULL, 'p',
 			 "Rapid positioning (G0).", "[x]:[y]:[z]"},
 			{"linear", 'l', POPT_ARG_STRING, NULL, 'l',
-			 "Linear move (G1).", "[x]:[y]:[z]>"},
+			 "Linear move (G1).", "[x]:[y]:[z]"},
 			{"dwell", 'd', POPT_ARG_INT, NULL, 'd',
 			 "Dwell for <time> seconds (G4).", "time"},
 			{"inches", 'i', POPT_ARG_NONE, NULL, 'i',
@@ -137,7 +137,7 @@ int main(int argc, const char **argv)
 		int rc;
 		char *arg;
 		while((rc = poptGetNextOpt(ctx)) > 0) {
-			arg = poptGetArg(ctx);
+			arg = poptGetOptArg(ctx);
 			switch(rc) {
 			case 's':
 				gcode_append(&tail, asprintfx("G1 F%s", arg));
@@ -150,7 +150,9 @@ int main(int argc, const char **argv)
 				if(coords) {
 					gcode_append(&tail, asprintfx("G0 %s", coords));
 				}
+				break;
 			}
+			
 				
 			default:
 				break;
