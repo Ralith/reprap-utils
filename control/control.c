@@ -60,13 +60,11 @@ char* decodeCoords(char *coord)
 			
 		explicit[write++] = coord[i];
 		last = coord[i];
-		printf("Parsing %c\n", coord[i]);
 	}
 	if(explicit[write-1] == ':') {
 		explicit[write++] = '_';
 	}
 	explicit[write++] = '\0';
-	printf("Explicit: %s\n", explicit);
 
 	char *ret = calloc(strlen(coord)+3, sizeof(char));
 	char *tok = strtok(explicit, ":");
