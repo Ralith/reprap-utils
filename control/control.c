@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-#include <popt.h>
+#include <getopt.h>
 
 #include "../common/handlesigs.h"
 #include "../common/asprintfx.h"
@@ -12,6 +12,40 @@
 #define STR(x) _STR(x)
 
 #define DEFAULT_SPEED 19200
+
+void usage(char *progname)
+{
+	fprintf(stderr, "%s [h?imarspldetfz]*\n", progname);
+}
+
+void help(char *progname) 
+{
+	usage(progname);
+	printf("Each option represents one or more machine control or configuration messages.  Messages are output in the order that their corresponding options were provided.  Repeated options will result in repeated messages.\n");
+
+	char *commands[][3] = {
+		{"s", "speed", "Set movement speed."},
+		{"p", "[x]:[y]:[z]", "Rapid positioning (G0)."},
+		{"l", "[x]:[y]:[z]", "Linear move (G1)."},
+		{"d", "time\t", "Dwell for <time> seconds (G4)."},
+		{"i", NULL, "Set units to inches (G20)."},
+		{"m", NULL, "Set units to milimeters (default) (G21)."},
+		{"a", NULL, "Use absolute coordinates (default) (G90)."},
+		{"r", NULL, "Use relative/incremental coordinates (G91)."},
+		{"e", "on|reverse|off", "Set extruder motor state (M101/M102/M103)."},
+		{"t", "temperature", "Set extrusion temperature in Celsius (M104)."},
+		{"f", "speed", "Sets extrusion motor speed (M108)."},
+		{"z", "[x][y][z]", "Zeroes the axes named in the argument."},
+		{"h", NULL, "Displays this help message."},
+		{NULL, NULL, NULL}
+	};
+
+	size_t i = 0;
+	while(commands[i][0] != NULL) {
+		fprintf(stderr, "\t-%s %s\t%s\n", commands[i][0], (commands[i][1] ? commands[i][1] : "\t"), commands[i][2]);
+		i++;
+	}
+}
 
 typedef struct gcode_cmd
 {
@@ -100,87 +134,41 @@ int isnum(char *str)
 	return 1;
 }
 
-int main(int argc, const char **argv) 
+int main(int argc, char **argv) 
 {
 	init_sig_handling();
 
 	gcode_cmd *head, *tail;
+	/* Standard prelude, sets up absolute milimeter coordinates as a
+	 * reliable default. */
 	head = gcode("G21");
 	tail = head;
 	gcode_append(&tail, "G90");
 
-	/* Get options */
-	long speed = DEFAULT_SPEED;
-	char *devpath = NULL;
-	char verbose = 0;
-	char pretending = 0;
+	/* Handle options */
 	{
-		poptContext ctx;
-
-		struct poptOption options_table[] = {
-			{"linespeed", NULL, POPT_ARG_LONG, &speed, 0,
-			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
-			{"pretend", NULL, POPT_ARG_VAL, &pretending, 1,
-			 "Output gcode instead of sending it to the machine.", NULL},
-			{"verbose", 'v', POPT_ARG_VAL, &verbose, 1,
-			 "Print all communications with the machine.", NULL},
-
-			{"speed", 's', POPT_ARG_INT, NULL, 's',
-			 "Set movement speed.", "speed"},
-			{"rapid", 'p', POPT_ARG_STRING, NULL, 'p',
-			 "Rapid positioning (G0).", "[x]:[y]:[z]"},
-			{"linear", 'l', POPT_ARG_STRING, NULL, 'l',
-			 "Linear move (G1).", "[x]:[y]:[z]"},
-			{"dwell", 'd', POPT_ARG_INT, NULL, 'd',
-			 "Dwell for <time> seconds (G4).", "time"},
-			{"inches", 'i', POPT_ARG_NONE, NULL, 'i',
-			 "Set units to inches (G20).", NULL},
-			{"milimeters", 'm', POPT_ARG_NONE, NULL, 'm',
-			 "Set units to milimeters (default) (G21).", NULL},
-			{"absolute", 'a', POPT_ARG_NONE, NULL, 'a',
-			 "Use absolute coordinates (default) (G90).", NULL},
-			{"relative", 'r', POPT_ARG_NONE, NULL, 'r',
-			 "Use relative/incremental coordinates (G91).", NULL},
-			
-			{"extrude", 'e', POPT_ARG_STRING, NULL, 'e',
-			 "Set extruder motor state (M101/M102/M103).", "on|reverse|off"},
-			{"temp", 't', POPT_ARG_INT, NULL, 't',
-			 "Set extrusion temperature in Celsius (M104).", "temperature"},
-			{"flowrate", 'f', POPT_ARG_INT, NULL, 'f',
-			 "Sets extrusion motor speed (M108).", "speed"},
-
-			{"zero", 'z', POPT_ARG_STRING, NULL, 'z',
-			 "Zeroes the axes named in the argument.", "[x][y][z]"},
-			POPT_AUTOHELP
-			{NULL, 0, 0, NULL, 0}
-		};
-
-		ctx = poptGetContext(NULL, argc, argv, options_table, 0);
-		poptSetOtherOptionHelp(ctx, "<serial device>");
-
 		if (argc < 2) {
-			poptPrintUsage(ctx, stderr, 0);
+			help(argv[0]);
 			exit(EXIT_FAILURE);
 		}
 
 		/* Process args */
-		int rc;
-		char *arg;
-		while((rc = poptGetNextOpt(ctx)) > 0) {
-			arg = poptGetOptArg(ctx);
-			switch(rc) {
+		int opt;
+		/* TODO: Generate the getopt string automatically */
+		while((opt = getopt(argc, argv, "himars:p:l:d:e:t:f:z:")) >= 0) {
+			switch(opt) {
 			case 's':
-				if(!isnum(arg)) {
+				if(!isnum(optarg)) {
 					fprintf(stderr, "Speed requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
-				gcode_append(&tail, asprintfx("G1 F%s", arg));
+				gcode_append(&tail, asprintfx("G1 F%s", optarg));
 				break;
 
 			case 'p':
 			{
 				static char *coords;
-				coords = decodeCoords(arg);
+				coords = decodeCoords(optarg);
 				
 				if(coords == NULL) {
 					fprintf(stderr, "Invalid coordinate formatting.\n");
@@ -199,7 +187,7 @@ int main(int argc, const char **argv)
 			case 'l':
 			{
 				static char *coords;
-				coords = decodeCoords(arg);
+				coords = decodeCoords(optarg);
 				
 				if(coords == NULL) {
 					fprintf(stderr, "Invalid coordinate formatting.\n");
@@ -216,11 +204,11 @@ int main(int argc, const char **argv)
 			}
 
 			case 'd':
-				if(!isnum(arg)) {
+				if(!isnum(optarg)) {
 					fprintf(stderr, "Dwell requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
-				gcode_append(&tail, asprintfx("G4 P%s", arg));
+				gcode_append(&tail, asprintfx("G4 P%s", optarg));
 				break;
 
 			case 'i':
@@ -240,11 +228,11 @@ int main(int argc, const char **argv)
 				break;
 
 			case 'e':
-				if(strcasecmp(arg, "on") == 0) {
+				if(strcasecmp(optarg, "on") == 0) {
 					gcode_append(&tail, "M101");
-				} else if(strcasecmp(arg, "reverse")) {
+				} else if(strcasecmp(optarg, "reverse")) {
 					gcode_append(&tail, "M102");
-				} else if(strcasecmp(arg, "off")) {
+				} else if(strcasecmp(optarg, "off")) {
 					gcode_append(&tail, "M103");
 				} else {
 					fprintf(stderr, "Argument to extrude must be one of on, reverse, or off.\n");
@@ -253,20 +241,20 @@ int main(int argc, const char **argv)
 				break;
 
 			case 't':
-				if(!isnum(arg)) {
+				if(!isnum(optarg)) {
 					fprintf(stderr, "Extruder temperature requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
-				gcode_append(&tail, asprintfx("M104 S%s", arg));
+				gcode_append(&tail, asprintfx("M104 S%s", optarg));
 				break;
 
 			case 'f':
 			{
-				if(!isnum(arg)) {
+				if(!isnum(optarg)) {
 					fprintf(stderr, "Extruder flowrate requires a numeric argument!\n");
 					exit(EXIT_FAILURE);
 				}
-				gcode_append(&tail, asprintfx("M108 S%s", arg));
+				gcode_append(&tail, asprintfx("M108 S%s", optarg));
 				break;
 			}
 
@@ -278,14 +266,14 @@ int main(int argc, const char **argv)
 				doz = 0;
 
 				static size_t i;
-				for(i = 0; i < strlen(arg); i++) {
-					if(arg[i] == 'x' || arg[i] == 'X') {
+				for(i = 0; i < strlen(optarg); i++) {
+					if(optarg[i] == 'x' || optarg[i] == 'X') {
 						dox = 1;
 					}
-					if(arg[i] == 'y' || arg[i] == 'Y') {
+					if(optarg[i] == 'y' || optarg[i] == 'Y') {
 						doy = 1;
 					}
-					if(arg[i] == 'z' || arg[i] == 'Z') {
+					if(optarg[i] == 'z' || optarg[i] == 'Z') {
 						doz = 1;
 					}
 				}
@@ -306,46 +294,27 @@ int main(int argc, const char **argv)
 											  (doy ? "Y0 " : ""),
 											  (doz ? "Z0" : "")));
 				break;
-			}
+			}	
+
+			case 'h':
+				help(argv[0]);
+				exit(EXIT_SUCCESS);
 				
-				
+			case '?':
+				help(argv[0]);
+				exit(EXIT_FAILURE);
+			
 			default:
 				break;
 			}
-
-			if(arg) {
-				free(arg);
-			}
-		}
-		/* Anything remaining is the dev path. */
-		devpath = poptGetArg(ctx);
-
-		if((devpath == NULL) || (poptPeekArg(ctx) != NULL)) {
-			poptPrintUsage(ctx, stderr, 0);
-			exit(EXIT_FAILURE);
-		}
-
-		if (rc < -1) {
-			/* An error occurred during option processing */
-			fprintf(stderr, "Error parsing arguments: %s: %s\n",
-					poptBadOption(ctx, POPT_BADOPTION_NOALIAS),
-					poptStrerror(rc));
-			exit(EXIT_FAILURE);
 		}
 	}
-
-	char *cmd = asprintfx("rru-gcode-dump %s -s %ld %s", (verbose ? "-v" : "-q"), speed, devpath);
-	FILE *output = (pretending ? stdout : popen(cmd, "w"));
-	free(cmd);
 
 	gcode_cmd *current = head;
 	while(current != NULL) {
-		fwrite(current->command, sizeof(char), strlen(current->command), output);
-		fwrite("\r\n", sizeof(char), 2, output);
+		printf("%s\r\n", current->command);
+		current = current->next;
 	}
 
-	if(output != stdout) {
-		exit(pclose(output));
-	}
 	exit(EXIT_SUCCESS);
 }
