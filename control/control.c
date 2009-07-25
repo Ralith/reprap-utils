@@ -40,6 +40,41 @@ void gcode_append(gcode_cmd **tail, char *new)
 	*tail = gnew;
 }
 
+char* decodeCoords(char *coord) 
+{
+	char *explicit = calloc(strlen(coord)+3, sizeof(char));
+	size_t write, i;
+	char last = '\0';
+	int blanks = 0;
+	for(i = 0, write = 0; i < strlen(explicit); i++) {
+		if(coord[i] == ':' && last == ':') {
+			blanks++;
+			if(blanks > 2) {
+				/* Invalid arg or no coords set */
+				return NULL;
+			}
+			explicit[write++] = '_';
+		}
+		explicit[write++] = coord[i];
+		last = coord[i];
+	}
+
+	char *ret = calloc(strlen(coord)+3, sizeof(char));
+	char *tok = strtok(explicit, ":");
+	i = 0;
+	do {
+		if(strcmp("_", tok) != 0) {
+			strcat(ret, &("XYZ"[i]));
+			strcat(ret, tok);
+			strcat(ret, " ");
+		}
+		i++;
+	} while((tok = strtok(NULL, ":")) && i < 3);
+	free(explicit);
+	
+	return ret;
+}
+
 int main(int argc, const char **argv) 
 {
 	init_sig_handling();
@@ -47,6 +82,7 @@ int main(int argc, const char **argv)
 	gcode_cmd *head, *tail;
 	head = gcode("G21");
 	tail = head;
+	gcode_append(&tail, "G90");
 
 	/* Get options */
 	long speed = DEFAULT_SPEED;
@@ -64,7 +100,7 @@ int main(int argc, const char **argv)
 			{"rapid", 'p', POPT_ARG_STRING, NULL, 'p',
 			 "Rapid positioning (G0).", "[x]:[y]:[z]"},
 			{"linear", 'l', POPT_ARG_STRING, NULL, 'l',
-			 "Linear move (G1).", "<[x]:[y]:[z]>"},
+			 "Linear move (G1).", "[x]:[y]:[z]>"},
 			{"dwell", 'd', POPT_ARG_INT, NULL, 'd',
 			 "Dwell for <time> seconds (G4).", "time"},
 			{"inches", 'i', POPT_ARG_NONE, NULL, 'i',
@@ -106,6 +142,15 @@ int main(int argc, const char **argv)
 			case 's':
 				gcode_append(&tail, asprintfx("G1 F%s", arg));
 				break;
+
+			case 'p':
+			{
+				static char *coords;
+				coords = decodeCoords(arg);
+				if(coords) {
+					gcode_append(&tail, asprintfx("G0 %s", coords));
+				}
+			}
 				
 			default:
 				break;
@@ -121,6 +166,13 @@ int main(int argc, const char **argv)
 		if((devpath == NULL) || (poptPeekArg(ctx) != NULL)) {
 			poptPrintUsage(ctx, stderr, 0);
 			exit(EXIT_FAILURE);
+		}
+	}
+
+	{
+		gcode_cmd *i;
+		for(i = head; i != NULL; i = i->next) {
+			printf("GCODE: %s\n", i->command);
 		}
 	}
 
