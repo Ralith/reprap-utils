@@ -29,15 +29,17 @@ int main(int argc, const char** argv)
 		poptContext ctx;
 
 		struct poptOption options_table[] = {
-			{"linespeed", 's', POPT_ARG_LONG, &speed, 0,
+			{"linespeed", 'l', POPT_ARG_LONG, &speed, 0,
 			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
 
+			{"speed", 's', POPT_ARG_INT, NULL, 0,
+			 "Set movement speed.", "speed"},
 			{"rapid", 'p', POPT_ARG_STRING, NULL, 0,
-			 "Rapid positioning (G0).", "<[x]:[y]:[z]>"},
+			 "Rapid positioning (G0).", "[x]:[y]:[z]"},
 			{"linear", 'l', POPT_ARG_STRING, NULL, 0,
 			 "Linear move (G1).", "<[x]:[y]:[z]>"},
 			{"dwell", 'd', POPT_ARG_INT, NULL, 0,
-			 "Dwell for <time> seconds (G4).", "<time>"},
+			 "Dwell for <time> seconds (G4).", "time"},
 			{"inches", 'i', POPT_ARG_NONE, NULL, 0,
 			 "Set units to inches (G20).", NULL},
 			{"milimeters", 'm', POPT_ARG_NONE, NULL, 0,
@@ -48,14 +50,14 @@ int main(int argc, const char** argv)
 			 "Use relative/incremental coordinates (G91).", NULL},
 			
 			{"extrude", 'e', POPT_ARG_STRING, NULL, 0,
-			 "Set extruder motor state (M101/M103).", "<on|off|reverse>"},
+			 "Set extruder motor state (M101/M103).", "on|off|reverse"},
 			{"temp", 't', POPT_ARG_INT, NULL, 0,
-			 "Set extrusion temperature in Celsius (M104).", "<temperature>"},
+			 "Set extrusion temperature in Celsius (M104).", "temperature"},
 			{"flowrate", 'f', POPT_ARG_INT, NULL, 0,
-			 "Sets extrusion motor speed (M108).", "<speed>"},
+			 "Sets extrusion motor speed (M108).", "speed"},
 
 			{"zero", 'z', POPT_ARG_STRING, NULL, 0,
-			 "Zeroes the axes named in the argument.", "<[x][y][z]>"},
+			 "Zeroes the axes named in the argument.", "[x][y][z]"},
 			POPT_AUTOHELP
 			{NULL, 0, 0, NULL, 0}
 		};
