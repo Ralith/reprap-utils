@@ -1,1 +1,0 @@
-/usr/bin/gcc    -fPIC CMakeFiles/rru-gcode-gen.dir/gcode-gen.o  -o rru-gcode-gen -rdynamic ../common/librru-common.a 
