@@ -182,7 +182,7 @@ int main(int argc, const char **argv)
 					fprintf(stderr, "Invalid coordinate formatting.");
 					exit(EXIT_FAILURE);
 				}
-				if(strcmp(coords, "")) {
+				if(strcmp(coords, "") == 0) {
 					fprintf(stderr, "Must specify at least one movement.");
 					exit(EXIT_FAILURE);
 				}
@@ -201,7 +201,7 @@ int main(int argc, const char **argv)
 					fprintf(stderr, "Invalid coordinate formatting.");
 					exit(EXIT_FAILURE);
 				}
-				if(strcmp(coords, "")) {
+				if(strcmp(coords, "") == 0) {
 					fprintf(stderr, "Must specify at least one movement.");
 					exit(EXIT_FAILURE);
 				}
