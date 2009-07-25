@@ -118,7 +118,7 @@ int main(int argc, const char **argv)
 		poptContext ctx;
 
 		struct poptOption options_table[] = {
-			{"linespeed", 'l', POPT_ARG_LONG, &speed, 0,
+			{"linespeed", NULL, POPT_ARG_LONG, &speed, 0,
 			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
 
 			{"speed", 's', POPT_ARG_INT, NULL, 's',
