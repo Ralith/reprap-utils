@@ -157,6 +157,7 @@ int main(int argc, const char **argv)
 				if(coords) {
 					gcode_append(&tail, asprintfx("G0 %s", coords));
 				}
+				free(coords);
 				break;
 			}
 			
