@@ -16,7 +16,7 @@ typedef struct _gcode_cmd
 	struct _gcode_cmd *next;
 } gcode_cmd;
 
-int main(int argc, char** argv) 
+int main(int argc, const char** argv) 
 {
 	init_sig_handling();
 
@@ -26,7 +26,7 @@ int main(int argc, char** argv)
 	gcode_cmd head, *tail;
 	int verbose = 0;
 	{
-		poptContext popt_ctx;
+		poptContext ctx;
 
 		struct poptOption options_table[] = {
 			{"linespeed", 's', POPT_ARG_LONG, &speed, 0,
@@ -59,7 +59,14 @@ int main(int argc, char** argv)
 			POPT_AUTOHELP
 			{NULL, 0, 0, NULL, 0}
 		};
-			
+
+		ctx = poptGetContext(NULL, argc, argv, options_table, 0);
+		poptSetOtherOptionHelp(ctx, "[OPTIONS]* <serial device>");
+
+		if (argc < 2) {
+			poptPrintUsage(ctx, stderr, 0);
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	int serial = serial_open(devpath, speed);
