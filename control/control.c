@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <getopt.h>
+#include <popt.h>
 
 #include "../common/serial.h"
 #include "../common/handlesigs.h"
@@ -10,17 +10,11 @@
 
 #define DEFAULT_SPEED 19200
 
-#define HELP \
-	"\t-s <speed>\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n"		\
-	"\t-?\n" \
-	"\t-h\t\tDisplay this help message.\n" \
-	"\t-v\t\tVerbose: Prints serial I/O.\n" \
-	"\t-l <[x]:[y]:[z]>\tLinear move: Executes a linear move to the coords specified.\n"
-	
-
-void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-l] <serial device> [gcode file]\n", argv[0]);
-}
+typedef struct _gcode_cmd
+{
+	char *command;
+	struct _gcode_cmd *next;
+} gcode_cmd;
 
 int main(int argc, char** argv) 
 {
@@ -28,56 +22,49 @@ int main(int argc, char** argv)
 
 	/* Get options */
 	long speed = DEFAULT_SPEED;
-	char *devpath;
-	char **commands;
-	unsigned int cmdcount = 0;
+	char *devpath = NULL;
+	gcode_cmd head, *tail;
 	int verbose = 0;
 	{
-		int opt;
-		while ((opt = getopt(argc, argv, "h?vsl:")) >= 0) {
-			switch(opt) {
-			case 's':			/* Speed */
-				speed = strtol(optarg, NULL, 10);
-				break;
+		poptContext popt_ctx;
 
-			case 'v':			/* Verbose */
-				verbose = 1;
-				break;
+		struct poptOption options_table[] = {
+			{"linespeed", 's', POPT_ARG_LONG, &speed, 0,
+			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
 
-			case '?':			/* Help */
-			case 'h':
-				usage(argc, argv);
-				fprintf(stderr, HELP);
-				exit(EXIT_SUCCESS);
-				break;
+			{"rapid", 'p', POPT_ARG_STRING, NULL, 0,
+			 "Rapid positioning (G0).", "<[x]:[y]:[z]>"},
+			{"linear", 'l', POPT_ARG_STRING, NULL, 0,
+			 "Linear move (G1).", "<[x]:[y]:[z]>"},
+			{"dwell", 'd', POPT_ARG_INT, NULL, 0,
+			 "Dwell for <time> seconds (G4).", "<time>"},
+			{"inches", 'i', POPT_ARG_NONE, NULL, 0,
+			 "Set units to inches (G20).", NULL},
+			{"milimeters", 'm', POPT_ARG_NONE, NULL, 0,
+			 "Set units to milimeters (default) (G21).", NULL},
+			{"absolute", 'a', POPT_ARG_NONE, NULL, 0,
+			 "Use absolute coordinates (default) (G90).", NULL},
+			{"relative", 'r', POPT_ARG_NONE, NULL, 0,
+			 "Use relative/incremental coordinates (G91).", NULL},
+			
+			{"extrude", 'e', POPT_ARG_STRING, NULL, 0,
+			 "Set extruder motor state (M101/M103).", "<on|off|reverse>"},
+			{"temp", 't', POPT_ARG_INT, NULL, 0,
+			 "Set extrusion temperature in Celsius (M104).", "<temperature>"},
+			{"flowrate", 'f', POPT_ARG_INT, NULL, 0,
+			 "Sets extrusion motor speed (M108).", "<speed>"},
 
-			case 'l':
-				
-
-			default:
-				break;
-			}
-		}
-		switch(argc - optind) {
-		case 1:
-			devpath = argv[optind];
-			break;
-
-		case 0:
-			fprintf(stderr, "Too few arguments!\n");
-			usage(argc, argv);
-			exit(EXIT_FAILURE);
-
-		default:
-			fprintf(stderr, "You must supply a serial device path!\n");
-			usage(argc, argv);
-			exit(EXIT_FAILURE);
-		}
+			{"zero", 'z', POPT_ARG_STRING, NULL, 0,
+			 "Zeroes the axes named in the argument.", "<[x][y][z]>"},
+			POPT_AUTOHELP
+			{NULL, 0, 0, NULL, 0}
+		};
+			
 	}
 
 	int serial = serial_open(devpath, speed);
 	if(serial < 0) {
-		fprintf(stderr, "FATAL: %s\n", serial_strerror(serial));
+		fprintf(stderr, "Error opening serial device: %s\n", serial_strerror(serial));
 		exit(EXIT_FAILURE);
 	}
 
