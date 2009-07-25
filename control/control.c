@@ -177,10 +177,16 @@ int main(int argc, const char **argv)
 			{
 				static char *coords;
 				coords = decodeCoords(arg);
+				
 				if(coords == NULL) {
 					fprintf(stderr, "Invalid coordinate formatting.");
 					exit(EXIT_FAILURE);
 				}
+				if(strcmp(coords, "")) {
+					fprintf(stderr, "Must specify at least one movement.");
+					exit(EXIT_FAILURE);
+				}
+
 				gcode_append(&tail, asprintfx("G0 %s", coords));
 				free(coords);
 				break;
@@ -190,10 +196,16 @@ int main(int argc, const char **argv)
 			{
 				static char *coords;
 				coords = decodeCoords(arg);
+				
 				if(coords == NULL) {
 					fprintf(stderr, "Invalid coordinate formatting.");
 					exit(EXIT_FAILURE);
 				}
+				if(strcmp(coords, "")) {
+					fprintf(stderr, "Must specify at least one movement.");
+					exit(EXIT_FAILURE);
+				}
+				
 				gcode_append(&tail, asprintfx("G1 %s", coords));
 				free(coords);
 				break;
