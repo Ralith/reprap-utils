@@ -157,14 +157,14 @@ int main(int argc, char** argv)
 	int charsfound;				/* N chars of CONFIRM_MSG found. */
 	ssize_t len;
 
-	if(verbose || interactive) {
+	if(verbose && interactive) {
 		printf(PROMPT);
 	}
 	
 	while(fgets(readbuf, sizeof(readbuf), input)) {
 		len = strlen(readbuf);
 		if(verbose && !interactive) {
-			printf("%s", readbuf);
+			printf("> %s", readbuf);
 		}
 		
 		if(sigstate != NO_SIGNAL) {
@@ -234,16 +234,16 @@ int main(int argc, char** argv)
 			}
 		}
 
-		if(verbose || interactive) {
+		if(verbose && interactive) {
 			printf(PROMPT);
 		}
 	}
-	if(verbose || interactive) {
+	if(verbose && interactive) {
 		printf("\n");
 	}
 
 	if(noisy) {
-		printf("Successfully completed!\n");
+		printf("Successfully completed!\n", interactive);
 	}
 
 	exit(EXIT_SUCCESS);
