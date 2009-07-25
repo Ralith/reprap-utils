@@ -122,6 +122,8 @@ int main(int argc, const char **argv)
 			 "Serial linespeed (defaults to " STR(DEFAULT_SPEED) ".", "<speed>"},
 			{"pretend", NULL, POPT_ARG_VAL, &pretending, 1,
 			 "Output gcode instead of sending it to the machine.", NULL},
+			{"verbose", 'v', POPT_ARG_VAL, &verbose, 1,
+			 "Print all communications with the machine.", NULL},
 
 			{"speed", 's', POPT_ARG_INT, NULL, 's',
 			 "Set movement speed.", "speed"},
@@ -323,16 +325,18 @@ int main(int argc, const char **argv)
 			exit(EXIT_FAILURE);
 		}
 
-		if (rc < 0) {
+		if (rc < -1) {
 			/* An error occurred during option processing */
-			fprintf(stderr, "%s: %s\n",
+			fprintf(stderr, "Error parsing arguments: %s: %s\n",
 					poptBadOption(ctx, POPT_BADOPTION_NOALIAS),
 					poptStrerror(rc));
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	FILE *output = (pretending ? stdout : popen("rru-gcode-dump", "w"));
+	char *cmd = asprintfx("rru-gcode-dump %s -s %ld %s", (verbose ? "-v" : "-q"), speed, devpath);
+	FILE *output = (pretending ? stdout : popen(cmd, "w"));
+	free(cmd);
 
 	gcode_cmd *current = head;
 	while(current != NULL) {
