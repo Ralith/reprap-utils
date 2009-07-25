@@ -7,6 +7,7 @@
 
 #include "../common/serial.h"
 #include "../common/handlesigs.h"
+#include "../common/asprintfx.h"
 
 #define _STR(x) #x
 #define STR(x) _STR(x)
@@ -19,34 +20,24 @@ typedef struct gcode_cmd
 	struct gcode_cmd *next;
 } gcode_cmd;
 
-gcode_cmd* gcode(char *cmd, int argc, char **argv) 
+gcode_cmd* gcode(char *cmd) 
 {
 	gcode_cmd *ret = malloc(sizeof(gcode_cmd));
-	size_t len = 0;
-	
-	len += strlen(cmd);
 
-	int i;
-	for(i = 0; i < argc; i++) {
-		len += strlen(argv[i]);
-	}
-
-	ret->command = calloc(len+1, sizeof(char));
-	strcpy(ret->command, cmd);
-
-	for(i = 0; i < argc; i++) {
-		strcat(ret->command, argv[i]);
-	}
+	ret->command = cmd;
 	ret->next = NULL;
 	
 	return ret;
 }
 
-void gcode_append(gcode_cmd **tail, gcode_cmd *new) 
+void gcode_append(gcode_cmd **tail, char *new) 
 {
 	assert((*tail)->next == NULL);
-	(*tail)->next = new;
-	*tail = new;
+	
+	gcode_cmd *gnew = gcode(new);
+	
+	(*tail)->next = gnew;
+	*tail = gnew;
 }
 
 int main(int argc, const char **argv) 
@@ -54,7 +45,7 @@ int main(int argc, const char **argv)
 	init_sig_handling();
 
 	gcode_cmd *head, *tail;
-	head = gcode("G21", 0, NULL);
+	head = gcode("G21");
 	tail = head;
 
 	/* Get options */
@@ -108,10 +99,20 @@ int main(int argc, const char **argv)
 
 		/* Process args */
 		int rc;
+		char *arg;
 		while((rc = poptGetNextOpt(ctx)) > 0) {
+			arg = poptGetArg(ctx);
 			switch(rc) {
+			case 's':
+				gcode_append(&tail, asprintfx("G1 F%s", arg));
+				break;
+				
 			default:
 				break;
+			}
+
+			if(arg) {
+				free(arg);
 			}
 		}
 		/* Anything remaining is the dev path. */
