@@ -60,7 +60,7 @@ char* guessSerial()
 	char found = 0;
 	if(d) {
 		struct dirent *entry;
-		while(entry = readdir(d)) {
+		while(!found && (entry = readdir(d))) {
 			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
 				found = 1;
 				strcpy(dev, entry->d_name);
@@ -71,7 +71,7 @@ char* guessSerial()
 	closedir(d);
 
 	if(found) {
-		char *ret = malloc(sizeof(char)*(strlen(dev) + DEVPREFIX_LEN + 1));
+		char *ret = malloc(sizeof(char)*(strlen(dev) + strlen(DEVPATH "/") + 1));
 		strcpy(ret, DEVPATH);
 		strcat(ret, "/");
 		strcat(ret, dev);
