@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <string.h>
 #include <getopt.h>
 #include <poll.h>
@@ -26,7 +28,12 @@
 #define BUFFER_SIZE 128
 #define TIMEOUT_MSECS (30 * 1000)
 #define CONFIRM_MSG "ok\r\n"
+
 #define PROMPT "> "
+
+#define DEVPATH "/dev"
+#define DEVPREFIX "ttyUSB"
+#define DEVPREFIX_LEN 6
 
 #define HELP \
 	"If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n" \
@@ -41,9 +48,42 @@ void usage(int argc, char** argv) {
 	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] <serial device> [gcode file]\n", argv[0]);
 }
 
+
+char* guessSerial() 
+{
+	DIR *d = opendir(DEVPATH);
+	char *dev = NULL;
+	{
+		struct dirent foo;
+		dev = malloc(sizeof(foo.d_name));
+	}
+
+	strcpy(dev, DEVPATH);
+	strcat(dev, "/");
+
+	char found = 0;
+	if(d) {
+		struct dirent *entry;
+		while(entry = readdir(d)) {
+			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
+				found = 1;
+				strcat(dev, entry->d_name);
+			}
+		}
+	}
+	
+	closedir(d);
+
+	if(found) {
+		return dev;
+	}
+	return NULL;
+}
+
+
 /* Allows atexit to be used for guaranteed cleanup */
 int serial = -1;
-FILE* input = NULL;
+FILE *input = NULL;
 void cleanup() 
 {
 	if(serial > 0) {
@@ -106,9 +146,9 @@ int main(int argc, char** argv)
 			break;
 
 		case 0:
-			fprintf(stderr, "Too few arguments!\n");
-			usage(argc, argv);
-			exit(EXIT_FAILURE);
+			devpath = guessSerial();
+			filepath = "-";
+			break;
 
 		default:
 			fprintf(stderr, "Too many arguments!\n");
