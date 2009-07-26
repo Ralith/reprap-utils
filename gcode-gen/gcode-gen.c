@@ -73,6 +73,27 @@ void gcode_append(gcode_cmd **tail, char *new)
 	*tail = gnew;
 }
 
+
+int isnum(char *str) 
+{
+	size_t i;
+	int points = 0;
+	for(i = 0; i < strlen(str); i++) {
+		if((str[i] > '9' || str[i] < '0')) {
+			if(str[i] == '.') {
+				/* Only one '.' allowed */
+				if(points++ > 1) {
+					return 0;
+				}
+			} else {
+				return 0;
+			}
+		}	
+	}
+	return 1;
+}
+
+
 char* decodeCoords(char *coord) 
 {
 	/* Choose a delim */
@@ -124,6 +145,9 @@ char* decodeCoords(char *coord)
 	i = 0;
 	do {
 		if(strcmp("_", tok) != 0) {
+			if(!isnum(tok)) {
+				return NULL;
+			}
 			strcat(ret, &("X\0Y\0Z\0"[i*2]));
 			strcat(ret, tok);
 			strcat(ret, " ");
@@ -135,25 +159,6 @@ char* decodeCoords(char *coord)
 	free(delim);
 	
 	return ret;
-}
-
-int isnum(char *str) 
-{
-	size_t i;
-	int points = 0;
-	for(i = 0; i < strlen(str); i++) {
-		if((str[i] > '9' || str[i] < '0')) {
-			if(str[i] == '.') {
-				/* Only one '.' allowed */
-				if(points++ > 1) {
-					return 0;
-				}
-			} else {
-				return 0;
-			}
-		}	
-	}
-	return 1;
 }
 
 int main(int argc, char **argv) 
