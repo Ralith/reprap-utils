@@ -75,9 +75,29 @@ void gcode_append(gcode_cmd **tail, char *new)
 
 char* decodeCoords(char *coord) 
 {
+	/* Choose a delim */
+	size_t i;
 	size_t clen = strlen(coord);
+	char *delim = malloc(sizeof(char));
+	int colons = 0, commas = 0;
+	for(i = 0; i < clen; i++) {
+		if(coord[i] == ':') {
+			colons++;
+		} else if(coord[i] == ',') {
+			commas++;
+		}
+	}
+	if(colons == 2) {
+		strcpy(delim, ":");
+	} else if(commas == 2) {
+		strcpy(delim, ",");
+	} else {
+		/* Invalid delim usage */
+		return NULL;
+	}
+
 	char *explicit = calloc(clen+3, sizeof(char));
-	size_t write, i;
+	size_t write;
 	char last = '\0';
 	int blanks = 0;
 	for(i = 0, write = 0; i < strlen(coord); i++) {
@@ -100,7 +120,7 @@ char* decodeCoords(char *coord)
 	explicit[write++] = '\0';
 
 	char *ret = calloc(strlen(coord)+3, sizeof(char));
-	char *tok = strtok(explicit, ":");
+	char *tok = strtok(explicit, delim);
 	i = 0;
 	do {
 		if(strcmp("_", tok) != 0) {
@@ -109,8 +129,10 @@ char* decodeCoords(char *coord)
 			strcat(ret, " ");
 		}
 		i++;
-	} while((tok = strtok(NULL, ":")) && i < 3);
+	} while((tok = strtok(NULL, delim)) && i < 3);
+	
 	free(explicit);
+	free(delim);
 	
 	return ret;
 }
