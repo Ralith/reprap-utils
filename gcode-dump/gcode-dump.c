@@ -48,7 +48,6 @@ void usage(int argc, char** argv) {
 	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] <serial device> [gcode file]\n", argv[0]);
 }
 
-
 char* guessSerial() 
 {
 	DIR *d = opendir(DEVPATH);
@@ -58,16 +57,13 @@ char* guessSerial()
 		dev = malloc(sizeof(foo.d_name));
 	}
 
-	strcpy(dev, DEVPATH);
-	strcat(dev, "/");
-
 	char found = 0;
 	if(d) {
 		struct dirent *entry;
 		while(entry = readdir(d)) {
 			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
 				found = 1;
-				strcat(dev, entry->d_name);
+				strcpy(dev, entry->d_name);
 			}
 		}
 	}
@@ -75,7 +71,13 @@ char* guessSerial()
 	closedir(d);
 
 	if(found) {
-		return dev;
+		char *ret = malloc(sizeof(char)*(strlen(dev) + DEVPREFIX_LEN + 1));
+		strcpy(ret, DEVPATH);
+		strcat(ret, "/");
+		strcat(ret, dev);
+		free(dev);
+
+		return ret;
 	}
 	return NULL;
 }
