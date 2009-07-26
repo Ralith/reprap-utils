@@ -146,7 +146,15 @@ int main(int argc, char** argv)
 			break;
 
 		case 0:
+			if(noisy) {
+				printf("Guessing a likely USB serial device...\n");
+			}
 			devpath = guessSerial();
+			if(devpath == NULL) {
+				fprintf(stderr, "Unable to find any USB serial devices; please try again with the correct device manually specified.\n");
+				usage(argc, argv);
+				exit(EXIT_FAILURE);
+			}
 			filepath = "-";
 			break;
 
@@ -173,7 +181,7 @@ int main(int argc, char** argv)
 		if(noisy) {
 			printf("Reading gcode from standard input");
 			if(interactive) {
-				printf(", enter Ctrl-D (EOF) to finish.");
+				printf("; enter Ctrl-D (EOF) to finish.");
 			}
 			printf("\n");
 		}
