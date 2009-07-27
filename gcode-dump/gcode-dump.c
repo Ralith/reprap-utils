@@ -45,7 +45,7 @@
 	
 
 void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] <serial device> [gcode file]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-f gcode file] [serial device]\n", argv[0]);
 }
 
 char* guessSerial() 
@@ -62,7 +62,7 @@ char* guessSerial()
 		struct dirent *entry;
 		while(entry = readdir(d)) {
 			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
-				
+				found = 1;
 				strcpy(dev, entry->d_name);
 			}
 		}
@@ -109,10 +109,14 @@ int main(int argc, char** argv)
 	int interactive = isatty(STDIN_FILENO);
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "h?qvs:")) >= 0) {
+		while ((opt = getopt(argc, argv, "h?qvs:f:")) >= 0) {
 			switch(opt) {
 			case 's':			/* Speed */
 				speed = strtol(optarg, NULL, 10);
+				break;
+
+			case 'f':
+				filepath = optarg;
 				break;
 
 			case 'q':			/* Quiet */
@@ -137,14 +141,9 @@ int main(int argc, char** argv)
 			}
 		}
 		switch(argc - optind) {
-		case 2:
-			devpath = argv[optind];
-			filepath = argv[optind + 1];
-			break;
 
 		case 1:
 			devpath = argv[optind];
-			filepath = "-";
 			break;
 
 		case 0:
@@ -157,13 +156,16 @@ int main(int argc, char** argv)
 				usage(argc, argv);
 				exit(EXIT_FAILURE);
 			}
-			filepath = "-";
 			break;
 
 		default:
 			fprintf(stderr, "Too many arguments!\n");
 			usage(argc, argv);
 			exit(EXIT_FAILURE);
+		}
+		
+		if(filepath == NULL) {
+			filepath = "-";
 		}
 	}
 	if(noisy) {
