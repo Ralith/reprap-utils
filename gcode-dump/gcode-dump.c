@@ -60,9 +60,9 @@ char* guessSerial()
 	char found = 0;
 	if(d) {
 		struct dirent *entry;
-		while(!found && (entry = readdir(d))) {
+		while(entry = readdir(d)) {
 			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
-				found = 1;
+				
 				strcpy(dev, entry->d_name);
 			}
 		}

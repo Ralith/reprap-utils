@@ -117,13 +117,14 @@ char* decodeCoords(char *coord)
 		return NULL;
 	}
 
+	/* Insert _ into unspecified coord fields */
 	char *explicit = calloc(clen+3, sizeof(char));
 	size_t write;
 	char last = '\0';
 	int blanks = 0;
 	for(i = 0, write = 0; i < strlen(coord); i++) {
-		if((i == 0 && coord[i] == ':') ||
-		   (last == ':' && coord[i] == ':')) {
+		if((i == 0 && coord[i] == delim[0]) ||
+		   (last == delim[0] && coord[i] == delim[0])) {
 			blanks++;
 			if(blanks > 2) {
 				/* Invalid arg or no coords set */
@@ -135,7 +136,7 @@ char* decodeCoords(char *coord)
 		explicit[write++] = coord[i];
 		last = coord[i];
 	}
-	if(explicit[write-1] == ':') {
+	if(explicit[write-1] == delim[0]) {
 		explicit[write++] = '_';
 	}
 	explicit[write++] = '\0';
