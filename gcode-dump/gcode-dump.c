@@ -32,6 +32,7 @@
 #define DEFAULT_SPEED 19200
 #define BUFFER_SIZE 128
 #define TIMEOUT_MSECS (30 * 1000)
+#define SHORT_TIMEOUT 10
 #define CONFIRM_MSG "ok\r\n"
 
 #define PROMPT "> "
@@ -272,7 +273,7 @@ int main(int argc, char** argv)
 #endif
 
 	char readbuf[BUFFER_SIZE];
-	int ret, msg_confirmed;
+	int ret = 0, msg_confirmed;
 	int charsfound;				/* N chars of CONFIRM_MSG found. */
 	ssize_t len;
 
@@ -286,12 +287,14 @@ int main(int argc, char** argv)
 		char charsfound = 0;
 		/* Loop until we receive some data and no more is waiting. */
 		do {
-			/* Harmless (sets units to MM) */
-			serial_write(serial, "G21\n", 4);
+			/* Harmless (get current temp) */
+			if(ret == 0) {
+				serial_write(serial, "M108\n", 5);
+			}
 #ifdef UNIX
-			ret = poll(fds, 1, 10);
+			ret = poll(fds, 1, SHORT_TIMEOUT);
 #elif WINDOWS
-			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, 10)) {
+			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, SHORT_TIMEOUT)) {
 			case WAIT_FAILED:
 				/* TODO: Get error */
 				ret = -1;
@@ -317,6 +320,8 @@ int main(int argc, char** argv)
 				exit(EXIT_FAILURE);
 			} else if(ret > 0) {
 				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
+				readbuf[len] = '\0';
+				printf("%s\n", readbuf);
 				/* Scan for confirmation message */
 				int i;
 				for(i = 0; i < len; i++) {
