@@ -1,7 +1,9 @@
 #ifndef _SERIAL_H_
 #define _SERIAL_H_
 
-#ifdef WINDOWS
+#ifdef UNIX
+#include <sys/types.h>
+#elif WINDOWS
 #include <windows.h>
 #endif
 

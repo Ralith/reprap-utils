@@ -3,6 +3,7 @@
 #include <string.h>
 
 #ifdef UNIX
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -171,16 +172,16 @@ serial_port *serial_open(const char *path, long speed)
 	config.BaudRate = speed;
 	config.fBinary = TRUE;
 	config.fParity = FALSE;
-	config.fDtrControl = DTR_CONTROL_ENABLE;
+	config.Parity = NOPARITY;
+	config.fInX = FALSE;
+	config.fOutX = FALSE;
+/*	config.fDtrControl = DTR_CONTROL_ENABLE;
 	config.fDsrSensitivity = FALSE;
 	config.fTXContinueOnXoff = TRUE;
-	config.fOutX = FALSE;
-	config.fInX = FALSE;
 	config.fErrorChar = FALSE;
 	config.fNull = TRUE;
 	config.fRtsControl = RTS_CONTROL_ENABLE;
-	config.fAbortOnError = FALSE;
-	config.Parity = NOPARITY;
+	config.fAbortOnError = FALSE;*/
 
 	if(!SetCommState(port->handle, &config)) {
 		serial_errno = SERIAL_SETTING_FAILED;

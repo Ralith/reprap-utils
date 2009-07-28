@@ -248,7 +248,7 @@ int main(int argc, char** argv)
 
 	if(strncmp("-", filepath, 1) == 0) {
 		if(noisy) {
-			printf("Reading gcode from standard input");
+			printf("Will read gcode from standard input");
 			if(interactive) {
 				printf("; enter Ctrl-D (EOF) to finish.");
 			}
@@ -267,7 +267,7 @@ int main(int argc, char** argv)
 	int timeout;
 #ifdef UNIX
 	struct pollfd fds[1];
-	fds[0].fd = serial;
+	fds[0].fd = serial->handle;
 	fds[0].events = POLLIN;
 #endif
 
@@ -275,6 +275,61 @@ int main(int argc, char** argv)
 	int ret, msg_confirmed;
 	int charsfound;				/* N chars of CONFIRM_MSG found. */
 	ssize_t len;
+
+	/* Be sure that the machine's ready */
+	{
+		if(noisy) {
+			printf("Waiting for machine to come up...\n");
+		}
+		char ready = 0;
+		char almost = 0;
+		/* Loop until we receive some data and no more is waiting. */
+		do {
+			/* Harmless set unit MM */
+			serial_write(serial, "G21\n", 4);
+#ifdef UNIX
+			ret = poll(fds, 1, 0);
+#elif WINDOWS
+			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, 0)) {
+			case WAIT_FAILED:
+				/* TODO: Get error */
+				ret = -1;
+				break;
+
+			case WAIT_TIMEOUT:
+				ret = 0;
+				break;
+
+			case WAIT_OBJECT_0:
+				ret = 1;
+				break;
+
+			default:
+				break;
+			}
+#endif
+			if(ret < 0) {
+				checkSignal();
+
+				fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
+				fprintf(stderr, "Giving up.\n");
+				exit(EXIT_FAILURE);
+			} else if(ret > 0) {
+				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
+				almost = 1;
+			} else if(ret == 0) {
+				if(almost) {
+					ready = 1;
+				} else {
+					usleep(10000);
+				}
+			}
+		} while(!ready);
+		if(noisy) {
+			printf("Ready!\n");
+		}
+	}
+
 
 	if(verbose && interactive) {
 		printf(PROMPT);
