@@ -1,0 +1,54 @@
+All code contained within this project is made available under the BSD license detailed in LICENSE.
+
+Detailed information about the functionality of any tool can be obtained by calling it with -h (e.g. `rru-gcode-gen -h`).
+
+==============
+rru-gcode-dump
+==============
+
+This tool is intended to be used to send gcode to a RepRap machine listening on a serial port.  It can accept input either from a file, passed as the last argument, or, if the file is "-" or unspecified, gcode is read from the standard input, appropriate for minimal interactive use as well as input piped in from a file or a tool which generates gcode.
+
+Please note that serial speed defaults to 19200; you will receive unpredictable results if your RepRap operates with a different serial speed and you do not explicitly specify it.
+
+Examples:
+
+# Dumps the file minimug.gcode using serial linespeed 38400
+rru-gcode-dump -s 38400 /dev/ttyUSB0 ./minimug.gcode
+
+# Dumps the file minimug.gcode using default serial linespeed and
+# printing all communications to standard output.
+rru-gcode-dump -v /dev/ttyUSB0 < ./minimug.gcode
+
+# Dumps the file minimug.gcode without printing anything to
+# standard output.  Note that errors will still be printed to
+# standard error if necessary.
+cat ./minimug.gcode | rru-gcode-dump -q /dev/ttyUSB0
+
+# Interactively dumps the single command G1 X10 Y10 Z0 and exits
+# safely.
+rru-gcode-dump /dev/ttyUSB0
+G1 X10 Y10 Z0
+^D
+
+
+=============
+rru-gcode-gen
+=============
+
+This tool provides a simple, easy-to-use interface to generate gcode for maintenance and testing purposes, appropriate for writing to file for use as, for example, a Skeingorge header, or being piped directly into a RepRap machine through the use of a tool such as rru-gcode-dump.
+
+Examples:
+
+# Produces gcode to zero all three axes and linear-move to 50,0,0
+rru-gcode-gen -z xyz -l 50::
+
+# Produces gcode to linear-move to 12,17,42, then to 12,20,42.
+rru-gcode-gen -l 12:17:42 -l :3:
+
+# Instructs a machine connected on /dev/ttyUSB0 to cease
+# extruding and shut off the heater.
+rru-gcode-gen -e off -t 0 | rru-gcode-dump /dev/ttyUSB0
+
+# Instructs a machine connected on /dev/ttyUSB0 to begin warming
+# to ABS extrusion temperature and zero the X and Y axes.
+rru-gcode-gen -t 240 -z xy | rru-gcode-dump /dev/ttyUSB0

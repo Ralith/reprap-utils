@@ -1,0 +1,7 @@
+On any sufficiently POSIX-compatible system, run in a terminal
+
+  cmake . && make
+
+then as root, run:
+
+  make install
