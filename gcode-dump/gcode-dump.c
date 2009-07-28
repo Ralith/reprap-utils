@@ -320,8 +320,6 @@ int main(int argc, char** argv)
 				exit(EXIT_FAILURE);
 			} else if(ret > 0) {
 				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
-				readbuf[len] = '\0';
-				printf("%s\n", readbuf);
 				/* Scan for confirmation message */
 				int i;
 				for(i = 0; i < len; i++) {
