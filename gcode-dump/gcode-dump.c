@@ -283,14 +283,15 @@ int main(int argc, char** argv)
 		}
 		char ready = 0;
 		char almost = 0;
+		char charsfound = 0;
 		/* Loop until we receive some data and no more is waiting. */
 		do {
-			/* Harmless set unit MM */
+			/* Harmless (sets units to MM) */
 			serial_write(serial, "G21\n", 4);
 #ifdef UNIX
-			ret = poll(fds, 1, 0);
+			ret = poll(fds, 1, 10);
 #elif WINDOWS
-			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, 0)) {
+			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, 10)) {
 			case WAIT_FAILED:
 				/* TODO: Get error */
 				ret = -1;
@@ -316,12 +317,22 @@ int main(int argc, char** argv)
 				exit(EXIT_FAILURE);
 			} else if(ret > 0) {
 				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
-				almost = 1;
+				/* Scan for confirmation message */
+				int i;
+				for(i = 0; i < len; i++) {
+					if(readbuf[i] == CONFIRM_MSG[charsfound]) {
+						charsfound++;
+						if(charsfound >= strlen(CONFIRM_MSG)) {
+							almost = 1;
+							debug("Message receipt confirmed!");
+						}
+					} else {
+						charsfound = 0;
+					}
+				}
 			} else if(ret == 0) {
 				if(almost) {
 					ready = 1;
-				} else {
-					usleep(10000);
 				}
 			}
 		} while(!ready);
