@@ -8,7 +8,12 @@
 #include <dirent.h>
 #include <string.h>
 #include <getopt.h>
+
+#ifdef UNIX
 #include <poll.h>
+#elif WINDOWS
+#include <windows.h>
+#endif
 
 #include "../common/serial.h"
 #include "../common/handlesigs.h"
@@ -31,9 +36,14 @@
 
 #define PROMPT "> "
 
+#ifdef UNIX
 #define DEVPATH "/dev"
 #define DEVPREFIX "ttyUSB"
 #define DEVPREFIX_LEN 6
+#elif WINDOWS
+#define DEVPREFIX "COM"
+#define MAX_SERIAL_GUESSES 10
+#endif
 
 #define HELP \
 	"If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n" \
@@ -42,7 +52,17 @@
 	"\t-h\tDisplay this help message.\n" \
 	"\t-q\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
 	"\t-v\tVerbose: Prints serial I/O.\n"
-	
+
+
+void checkSignal() 
+{
+#ifdef UNIX
+	if(sigstate != NO_SIGNAL) {
+		fprintf(stderr, "Caught a fatal signal, cleaning up.\n");
+		exit(EXIT_FAILURE);
+	}
+#endif
+}
 
 void usage(int argc, char** argv) {
 	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-f gcode file] [serial device]\n", argv[0]);
@@ -50,6 +70,7 @@ void usage(int argc, char** argv) {
 
 char* guessSerial() 
 {
+#ifdef UNIX
 	DIR *d = opendir(DEVPATH);
 	char *dev = NULL;
 	{
@@ -60,7 +81,7 @@ char* guessSerial()
 	char found = 0;
 	if(d) {
 		struct dirent *entry;
-		while(entry = readdir(d)) {
+		while((entry = readdir(d))) {
 			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
 				found = 1;
 				strcpy(dev, entry->d_name);
@@ -80,15 +101,59 @@ char* guessSerial()
 		return ret;
 	}
 	return NULL;
+	
+#elif WINDOWS
+	char *devname = calloc(strlen(DEVPREFIX) + (MAX_SERIAL_GUESSES / 10), sizeof(char));
+	char *num = calloc(MAX_SERIAL_GUESSES / 10, sizeof(char));
+	int i;
+	char exists = 0;
+	for (i = 0; i < MAX_SERIAL_GUESSES; i++)
+    {
+		strcpy(devname, DEVPREFIX);
+		itoa(i, num, 10);
+		strcat(devname, num);
+  
+		HANDLE port = CreateFile(devname, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+		if (port == INVALID_HANDLE_VALUE) {
+			/* DWORD error = GetLastError(); */
+
+			/* Check to see if the error was because some other app
+			 * had the port open */
+			/* Ignore in-use ports. */
+			/* if (error == ERROR_ACCESS_DENIED) {
+				exists = 1;
+				}*/
+		} else {
+			/* The port was opened successfully */
+			exists = 1;
+
+			/* Don't forget to close the port, since we are going to
+			 * do nothing with it anyway */
+			CloseHandle(port);
+		}
+
+		/* Add the port number to the array which will be returned */
+		if(exists) {
+			break;
+		}
+	}
+	free(num);
+
+	if(exists) {
+		return devname;
+	}
+	free(devname);
+	return NULL;
+#endif
 }
 
 
 /* Allows atexit to be used for guaranteed cleanup */
-int serial = -1;
+serial_port *serial = NULL;
 FILE *input = NULL;
 void cleanup() 
 {
-	if(serial > 0) {
+	if(serial) {
 		serial_close(serial);
 	}
 	if(input != NULL && input != stdin) {
@@ -177,7 +242,7 @@ int main(int argc, char** argv)
 	/* Open FDs */
 	serial = serial_open(devpath, speed);
 	if(serial < 0) {
-		fprintf(stderr, "Error opening serial device: %s\n", serial_strerror(serial));
+		fprintf(stderr, "Error opening serial device: %s\n", serial_strerror(serial_errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -200,9 +265,11 @@ int main(int argc, char** argv)
 	}
 
 	int timeout;
+#ifdef UNIX
 	struct pollfd fds[1];
 	fds[0].fd = serial;
 	fds[0].events = POLLIN;
+#endif
 
 	char readbuf[BUFFER_SIZE];
 	int ret, msg_confirmed;
@@ -212,38 +279,52 @@ int main(int argc, char** argv)
 	if(verbose && interactive) {
 		printf(PROMPT);
 	}
-	
+
+	/* TODO: Use only poll so we can get input any time */
 	while(fgets(readbuf, sizeof(readbuf), input)) {
 		len = strlen(readbuf);
 		if(verbose && !interactive) {
 			printf("> %s", readbuf);
 		}
-		
-		if(sigstate != NO_SIGNAL) {
-			fprintf(stderr, "Caught a fatal signal, cleaning up.\n");
-			exit(EXIT_FAILURE);
-		}
+
+		checkSignal();
 
 		debug("Writing to serial...");
-		write(serial, readbuf, len);
+		serial_write(serial, readbuf, len);
 		if(readbuf[len-1] == '\n') {
 			debug("Wrote a complete line.");
 			/* Wait for 'ok' reply */
-			ret = 1;
 			msg_confirmed = 0;
 			charsfound = 0;
 			timeout = TIMEOUT_MSECS;
 			while(1) {
-				/* Add the serial FD to the set */
 				debug("Polling serial...");
+#ifdef UNIX
 				ret = poll(fds, 1, timeout);
+#elif WINDOWS
+				switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, timeout)) {
+				case WAIT_FAILED:
+					/* TODO: Get error */
+					ret = -1;
+					break;
+
+				case WAIT_TIMEOUT:
+					ret = 0;
+					break;
+
+				case WAIT_OBJECT_0:
+					ret = 1;
+					break;
+
+				default:
+					break;
+				}
+				
+#endif
 				debugf("done (returned %d).", ret);
 				
 				if(ret < 0) {
-					if(sigstate != NO_SIGNAL) {
-						fprintf(stderr, "Caught a fatal signal, cleaning up.\n");
-						exit(EXIT_FAILURE);
-					}
+					checkSignal();
 
 					fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
 					fprintf(stderr, "Giving up.\n");
@@ -260,7 +341,7 @@ int main(int argc, char** argv)
 				
 				/* We've got data! */
 				debug("Reading data from serial...");
-				len = read(serial, readbuf, sizeof(readbuf)-1);
+				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
 				readbuf[len] = '\0';
 				if(verbose) {
 					printf("%s", readbuf);
@@ -295,7 +376,7 @@ int main(int argc, char** argv)
 	}
 
 	if(noisy) {
-		printf("Successfully completed!\n", interactive);
+		printf("Successfully completed!\n");
 	}
 
 	exit(EXIT_SUCCESS);

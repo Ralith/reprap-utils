@@ -1,10 +1,17 @@
 #include "serial.h"
 
+#include <string.h>
+
+#ifdef UNIX
 #include <unistd.h>
-#include <termios.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <termios.h>
+#endif
 
+int serial_errno;
+
+#ifdef UNIX
 // Convert between the numeric speed and the termios representation
 // thereof.  Returns < 0 if argument is an unuspported speed.
 speed_t ntocf(long l) {
@@ -76,7 +83,6 @@ speed_t ntocf(long l) {
 	}
 }
 
-
 // Repeated many times to allow errors to be isolated to the specific
 // setting that failed to apply.  Returns < 0 on failure.
 int serial_set_attrib(int fd, struct termios* attribp) {
@@ -124,31 +130,108 @@ int serial_init(int fd, long speed) {
 	return 0;
 }
 
+#endif /* UNIX */
+
+
+
 /* Returns a prepared FD for the serial device specified, or some
  * value < 0 if an error occurred. */
-int serial_open(char* path, long speed) 
+serial_port *serial_open(const char *path, long speed) 
 {
-	int fd = open(path, O_RDWR | O_NOCTTY | O_NDELAY);
+	serial_errno = SERIAL_NO_ERROR;
+	serial_port *port = malloc(sizeof(serial_port));
+#ifdef UNIX
+	port->handle = open(path, O_RDWR | O_NOCTTY | O_NDELAY);
 	int status;
-	if((status = serial_init(fd, speed)) < 0) {
+	if((status = serial_init(port->handle, speed)) < 0) {
 		/* An error occurred */
-		return status;
+		serial_errno = status;
+		return NULL;
 	}
-	return fd;
+#elif WINDOWS
+	port->handle = CreateFile(path,
+							 GENERIC_READ | GENERIC_WRITE,
+							 0, NULL, OPEN_EXISTING, 0,
+							 NULL);
+	if(port->handle == INVALID_HANDLE_VALUE) {
+		/* DWORD err = GetLastError(); */
+		serial_errno = SERIAL_UNKNOWN_ERROR;
+		return NULL;
+	}
+
+	/* Configure */
+	DCB config;
+	FillMemory(&config, sizeof(config), 0);
+	if(!GetCommState(port->handle, &config)) {
+		serial_errno = SERIAL_UNKNOWN_ERROR;
+		return NULL;
+	}
+
+	/* This is mostly guessed. */
+	config.BaudRate = speed;
+	config.fBinary = TRUE;
+	config.fParity = FALSE;
+	config.fDtrControl = DTR_CONTROL_ENABLE;
+	config.fDsrSensitivity = FALSE;
+	config.fTXContinueOnXoff = TRUE;
+	config.fOutX = FALSE;
+	config.fInX = FALSE;
+	config.fErrorChar = FALSE;
+	config.fNull = TRUE;
+	config.fRtsControl = RTS_CONTROL_ENABLE;
+	config.fAbortOnError = FALSE;
+	config.Parity = NOPARITY;
+
+	if(!SetCommState(port->handle, &config)) {
+		serial_errno = SERIAL_SETTING_FAILED;
+		return NULL;
+	}
+#endif
+	return port;
 }
 
 
 /* Thin wrapper of standard close for consistency. */
-int serial_close(int fd) 
+int serial_close(serial_port *port) 
 {
-	return close(fd);
+#ifdef UNIX
+	return close(port->handle);
+#elif WINDOWS
+	CloseHandle(port->handle);
+	return 0;
+#endif
+}
+
+int serial_write(serial_port *port, const void *buf, size_t nbytes)
+{
+#ifdef UNIX
+	return write(port->handle, buf, nbytes);
+#elif WINDOWS
+	DWORD written = 0;
+	WriteFile(port->handle, buf, nbytes, &written, NULL);
+	return written;
+#endif
+}
+
+int serial_read(serial_port *port, void *buf, size_t nbytes) 
+{
+#ifdef UNIX
+	return read(port->handle, buf, nbytes);
+#elif WINDOWS
+	DWORD read = 0;
+	ReadFile(port->handle, buf, nbytes, &read, NULL);
+	return read;
+#endif
 }
 
 /* Returns a human-readable interpretation of a failing serial_open
  * return value */
-const char* serial_strerror(int errno) 
+const char* serial_strerror(int errno)
 {
 	switch(errno) {
+	case SERIAL_NO_ERROR:
+		return "No error.";
+		
 	case SERIAL_INVALID_SPEED:
 		return "Unsupported serial linespeed.";
 
@@ -158,7 +241,10 @@ const char* serial_strerror(int errno)
 	case SERIAL_SETTING_FAILED:
 		return "Unable to apply a necessary setting to the serial device.";
 
+	case SERIAL_UNKNOWN_ERROR:
+		return "An unknown error occurred.";
+
 	default:
-		return "Unknown error.  This is an internal bug.";
+		return "Unexpected error.  This is an internal bug.";
 	}
 }

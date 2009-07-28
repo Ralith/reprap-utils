@@ -1,5 +1,6 @@
 #include "handlesigs.h"
 
+#ifndef WINDOWS
 #include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -39,9 +40,10 @@ void sig_die() {
 		break;
 	}
 }
-
+#endif
 
 void init_sig_handling() {
+	#ifndef WINDOWS
 	sigstate = NO_SIGNAL;
 	
 	atexit(sig_die);
@@ -53,4 +55,5 @@ void init_sig_handling() {
 	
 	sigaction(SIGINT, &sa, &default_sigint_handler);
 	sigaction(SIGTERM, &sa, &default_sigterm_handler);
+	#endif
 }

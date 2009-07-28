@@ -3,7 +3,9 @@
 
 #define NO_SIGNAL -1
 
+#ifndef WINDOWS
 extern int sigstate;
+#endif
 
 void init_sig_handling();
 
