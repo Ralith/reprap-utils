@@ -47,12 +47,13 @@
 #endif
 
 #define HELP \
-	"If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n" \
+	"" \
 	"\t-s\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n"		\
 	"\t-?\n" \
 	"\t-h\tDisplay this help message.\n" \
 	"\t-q\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
-	"\t-v\tVerbose: Prints serial I/O.\n"
+	"\t-v\tVerbose: Prints serial I/O.\n" \
+    "\t-f\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
 void checkSignal() 
@@ -66,7 +67,7 @@ void checkSignal()
 }
 
 void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-f gcode file] [serial device]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-f <gcode file>] [serial device]\n", argv[0]);
 }
 
 char* guessSerial() 
