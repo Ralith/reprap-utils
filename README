@@ -12,8 +12,8 @@ Please note that serial speed defaults to 19200; you will receive unpredictable 
 
 Examples:
 
-# Dumps the file minimug.gcode using serial linespeed 38400
-rru-gcode-dump -s 38400 /dev/ttyUSB0 ./minimug.gcode
+# Dumps the file minimug.gcode using serial linespeed 38400 and automatically determining the correct serial port
+rru-gcode-dump -s 38400 -f ./minimug.gcode
 
 # Dumps the file minimug.gcode using default serial linespeed and
 # printing all communications to standard output.
@@ -49,6 +49,6 @@ rru-gcode-gen -l 12:17:42 -l :3:
 # extruding and shut off the heater.
 rru-gcode-gen -e off -t 0 | rru-gcode-dump /dev/ttyUSB0
 
-# Instructs a machine connected on /dev/ttyUSB0 to begin warming
+# Instructs an automatically detected machine to begin warming
 # to ABS extrusion temperature and zero the X and Y axes.
-rru-gcode-gen -t 240 -z xy | rru-gcode-dump /dev/ttyUSB0
+rru-gcode-gen -t 240 -z xy | rru-gcode-dump
