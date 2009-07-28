@@ -90,7 +90,7 @@ int serial_set_attrib(int fd, struct termios* attribp) {
 	if(tcsetattr(fd, TCSANOW, attribp) < 0) {
 		return SERIAL_SETTING_FAILED;
 	}
-	return 0;
+	return SERIAL_NO_ERROR;
 }
 
 int serial_init(int fd, long speed) {
@@ -128,7 +128,7 @@ int serial_init(int fd, long speed) {
 	if((status = serial_set_attrib(fd, &attribs)) < 0) {
 		return status;
 	}
-	return 0;
+	return SERIAL_NO_ERROR;
 }
 
 #endif /* UNIX */
@@ -149,7 +149,8 @@ serial_port *serial_open(const char *path, long speed)
 		return NULL;
 	}
 	int status;
-	if((status = serial_init(port->handle, speed)) < 0) {
+	if((status = serial_init(port->handle, speed)) !=
+	   SERIAL_NO_ERROR) {
 		/* An error occurred */
 		serial_errno = status;
 		return NULL;
