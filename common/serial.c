@@ -143,6 +143,11 @@ serial_port *serial_open(const char *path, long speed)
 	serial_port *port = malloc(sizeof(serial_port));
 #ifdef UNIX
 	port->handle = open(path, O_RDWR | O_NOCTTY | O_NDELAY);
+	if(port->handle < 0) {
+		/* An error ocurred */
+		serial_errno = SERIAL_INVALID_FILEDESC;
+		return NULL;
+	}
 	int status;
 	if((status = serial_init(port->handle, speed)) < 0) {
 		/* An error occurred */
