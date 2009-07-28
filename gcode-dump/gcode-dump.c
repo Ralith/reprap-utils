@@ -242,8 +242,8 @@ int main(int argc, char** argv)
 
 	/* Open FDs */
 	serial = serial_open(devpath, speed);
-	if(serial < 0) {
-		fprintf(stderr, "Error opening serial device: %s\n", serial_strerror(serial_errno));
+	if(serial == NULL) {
+		fprintf(stderr, "Error opening serial device %s: %s\n", devpath, serial_strerror(serial_errno));
 		exit(EXIT_FAILURE);
 	}
 
@@ -312,6 +312,7 @@ int main(int argc, char** argv)
 				break;
 			}
 #endif
+			checkSignal();
 			if(ret < 0) {
 				checkSignal();
 
