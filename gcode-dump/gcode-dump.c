@@ -290,7 +290,7 @@ int main(int argc, char** argv)
 		do {
 			/* Harmless (get current temp) */
 			if(ret == 0) {
-				serial_write(serial, "M108\n", 5);
+				serial_write(serial, "M105\n", 5);
 			}
 #ifdef UNIX
 			ret = poll(fds, 1, SHORT_TIMEOUT);
