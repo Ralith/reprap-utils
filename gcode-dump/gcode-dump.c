@@ -31,8 +31,7 @@
 
 #define DEFAULT_SPEED 19200
 #define BUFFER_SIZE 128
-#define TIMEOUT_MSECS (30 * 1000)
-#define SHORT_TIMEOUT 10
+#define SHORT_TIMEOUT 100
 #define CONFIRM_MSG "ok\r\n"
 
 #define PROMPT "> "
@@ -367,13 +366,12 @@ int main(int argc, char** argv)
 			/* Wait for 'ok' reply */
 			msg_confirmed = 0;
 			charsfound = 0;
-			timeout = TIMEOUT_MSECS;
 			while(1) {
 				debug("Polling serial...");
 #ifdef UNIX
-				ret = poll(fds, 1, timeout);
+				ret = poll(fds, 1, -1);
 #elif WINDOWS
-				switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, timeout)) {
+				switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, -1)) {
 				case WAIT_FAILED:
 					/* TODO: Get error */
 					ret = -1;
