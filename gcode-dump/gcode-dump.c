@@ -22,8 +22,8 @@
 #define STR(x) _STR(x)
 
 #ifdef DEBUG
-#define debug(msg) fprintf(stderr, "DEBUG: " msg "\n")
-#define debugf(fmt, ...) fprintf(stderr, "DEBUG: " fmt "\n", __VA_ARGS__)
+#define debug(msg) printf("DEBUG: " msg "\n")
+#define debugf(fmt, ...) printf("DEBUG: " fmt "\n", __VA_ARGS__)
 #else
 #define debug(msg)
 #define debugf(fmt, ...)
@@ -56,7 +56,7 @@
 	"\t-h\t\tDisplay this help message.\n" \
 	"\t-q\t\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
 	"\t-v\t\tVerbose: Prints serial I/O.\n" \
-	"\t-a writeahead\tNumber of additional messages to write before waiting for a flow control reply (\"ok\").\n" \
+	"\t-c\t\tFilter out non-meaningful chars. May stress noncompliant gcode interpreters.\n" \
     "\t-f file\t\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
@@ -71,7 +71,7 @@ void checkSignal()
 }
 
 void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-a writeahead] [-f <gcode file>] [serial device]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-c] [-f <gcode file>] [serial device]\n", argv[0]);
 }
 
 char* guessSerial() 
@@ -177,11 +177,11 @@ int main(int argc, char** argv)
 	char *filepath = NULL;
 	int noisy = 1;
 	int verbose = 0;
+	int compress = 0;
 	int interactive = isatty(STDIN_FILENO);
-	unsigned writeahead = DEFAULT_WRITEAHEAD;
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "h?qvs:f:a:")) >= 0) {
+		while ((opt = getopt(argc, argv, "h?qvcs:f:")) >= 0) {
 			switch(opt) {
 			case 's':			/* Speed */
 				speed = strtol(optarg, NULL, 10);
@@ -199,8 +199,8 @@ int main(int argc, char** argv)
 				verbose = 1;
 				break;
 
-			case 'a':
-				writeahead = strtol(optarg, NULL, 10);
+			case 'c':
+				compress = 1;
 				break;
 
 			case '?':			/* Help */
@@ -288,7 +288,8 @@ int main(int argc, char** argv)
 	int ret = 0;
 	int charsfound = 0;				/* N chars of CONFIRM_MSG found. */
 	size_t len;
-	size_t gcode_lastlen = 0;
+	size_t gcpoint = 0;
+	int gccomment = 0;
 	unsigned unconfirmed = 0;
 	while(1) {
 		debug("Polling...");
@@ -318,7 +319,7 @@ int main(int argc, char** argv)
 				
 		if(ret < 0) {
 			checkSignal();
-			fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
+			fprintf(stderr, "Error during poll: %s\n", strerror(errno));
 			fprintf(stderr, "Giving up.\n");
 			exit(EXIT_FAILURE);
 		}
@@ -358,47 +359,65 @@ int main(int argc, char** argv)
 		/* TODO: Windows */
 		if(fds[FD_INPUT].revents & POLLIN) {
 			/* We've got input data! */
-			/* TODO: Read char-at-a-time instead of in-bulk-then-loop
-			 * to avoid reading more blocks than we want to deal with
-			 * at once */
-			len = read(fds[FD_INPUT].fd, gcodebuf + gcode_lastlen, sizeof(gcodebuf) - gcode_lastlen - 1);
-			gcodebuf[len + gcode_lastlen] = '\0';
-
-			debug("Got gcode.");
-			/* If we got a line terminator, send the block. */
-			size_t point = gcode_lastlen ? gcode_lastlen - 1 : 0;
-			size_t end = gcode_lastlen + len;
-			for(; point < end; ++point) {
-				if(gcodebuf[point] == '\n') {
-					serial_write(serial, gcodebuf, point);
-					unconfirmed++;
-					debug("Sent complete block.");
-					if(unconfirmed > writeahead) {
-						/* We've sent enough; wait for confirmation messages now. */
-						fds[FD_INPUT].events = 0;
-					}
-					
-					if(verbose && !interactive) {
-						/* The terminal echos user input but not redirected input */
-						fwrite(gcodebuf, sizeof(char), point, stdout);
-						fflush(stdout);
-					}
-
-					/* (Note that we continue looping.) */
-					/* Move unsent gcode to the start of the buffer. */
-					len = len - (point - gcode_lastlen);
-					memmove(gcodebuf, &gcodebuf[point], len);
-					point = 0;
-					end = len;
-				}
-			}
-			gcode_lastlen = len;
-			if(len == 0) {
+			int ret;
+			char ch;
+			ret = read(fds[FD_INPUT].fd, &ch, 1);
+			
+			if(ret == 0) {
 				/* We're at EOF */
 				if(noisy) {
-					printf("Dump complete.\n");
+					printf("Got EOF; dump complete.\n");
 				}
 				exit(EXIT_SUCCESS);
+			} else if(ret < 0) {
+				/* Something went wrong */
+				checkSignal();
+				fprintf(stderr, "Error reading gcode: %s\n", strerror(errno));
+				fprintf(stderr, "Giving up.\n");
+				exit(EXIT_FAILURE);
+			}
+				
+			switch(ch) {
+			case '\r':
+			case '\n':
+				{
+					gccomment = 0;
+					if(gcpoint == 0) {
+						break;
+					}
+
+					serial_write(serial, gcodebuf, gcpoint);
+					serial_write(serial, "\r\n", 2);
+
+					debug("Sent complete block.");
+
+					if(verbose && !interactive) {
+						fwrite(gcodebuf, sizeof(char), gcpoint, stdout);
+						printf("\n");
+					}
+					
+					gcpoint = 0;
+
+					/* Stop polling input until we have confirmation */
+					fds[FD_INPUT].events = 0;
+
+					break;
+				}
+
+			case ';':
+				gccomment = 1;
+				break;
+
+			case ' ':
+			case '\t':
+				if(compress) {
+					break;
+				}
+			default:
+				if(!gccomment) {
+					gcodebuf[gcpoint++] = ch;
+				}
+				break;
 			}
 		}
 	}
