@@ -19,5 +19,5 @@ endif(UNIX)
 
 add_subdirectory(common)
 
-add_subdirectory(gcode-dump)
-add_subdirectory(gcode-gen)
+add_subdirectory(gcdump)
+add_subdirectory(gcgen)

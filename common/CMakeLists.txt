@@ -1,4 +1,4 @@
-add_library(rru-common STATIC
+add_library(common STATIC
   handlesigs.c
   serial.c
   asprintfx.c
