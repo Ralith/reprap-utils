@@ -30,11 +30,10 @@
 #endif
 
 #define DEFAULT_SPEED 19200
-#define BUFFER_SIZE 128
+#define SERIAL_BUFSIZE 128
+#define GCODE_BUFSIZE 512		/* Standard states 256 chars max */
 #define SHORT_TIMEOUT 100
 #define CONFIRM_MSG "ok\r\n"
-
-#define PROMPT "> "
 
 #ifdef UNIX
 #define DEVPATH "/dev"
@@ -44,6 +43,11 @@
 #define DEVPREFIX "COM"
 #define MAX_SERIAL_GUESSES 10
 #endif
+
+#define FD_COUNT 2
+/* Must be sequential from 0 to FD_COUNT-1 */
+#define FD_INPUT 0
+#define FD_SERIAL 1
 
 #define HELP \
 	"" \
@@ -151,14 +155,14 @@ char* guessSerial()
 
 /* Allows atexit to be used for guaranteed cleanup */
 serial_port *serial = NULL;
-FILE *input = NULL;
+int input = STDIN_FILENO;
 void cleanup() 
 {
 	if(serial) {
 		serial_close(serial);
 	}
-	if(input != NULL && input != stdin) {
-		fclose(input);
+	if(input != STDIN_FILENO) {
+		close(input);
 	}
 }
 int main(int argc, char** argv)
@@ -218,7 +222,7 @@ int main(int argc, char** argv)
 			}
 			devpath = guessSerial();
 			if(devpath == NULL) {
-				fprintf(stderr, "Unable to find any USB serial devices; please try again with the correct device manually specified.\n");
+				fprintf(stderr, "Unable to autodetect any USB serial devices; if you are certain the device is available, please manually specify the path.\n");
 				usage(argc, argv);
 				exit(EXIT_FAILURE);
 			}
@@ -255,193 +259,128 @@ int main(int argc, char** argv)
 			}
 			printf("\n");
 		}
-		input = stdin;
+		/* input defaults to stdin */
 	} else {
-		input = fopen(filepath, "r");
-		if(input == NULL) {
+		input = open(filepath, O_RDONLY);
+		if(input < 0) {
 			fprintf(stderr, "Unable to open gcode file \"%s\": %s\n", filepath, strerror(errno));
 			exit(EXIT_FAILURE);
 		}
 		interactive = 0;
 	}
 
-	int timeout;
 #ifdef UNIX
-	struct pollfd fds[1];
-	fds[0].fd = serial->handle;
-	fds[0].events = POLLIN;
+	struct pollfd fds[FD_COUNT];
+	fds[FD_INPUT].fd = input;
+	fds[FD_INPUT].events = POLLIN;
+	fds[FD_SERIAL].fd = serial->handle;
+	fds[FD_SERIAL].events = POLLIN;
 #endif
 
-	char readbuf[BUFFER_SIZE];
-	int ret = 0, msg_confirmed;
-	int charsfound;				/* N chars of CONFIRM_MSG found. */
-	ssize_t len;
-
-	/* Be sure that the machine's ready */
-	{
-		if(noisy) {
-			printf("Waiting for machine to come up...\n");
-		}
-		char ready = 0;
-		char almost = 0;
-		char charsfound = 0;
-		/* Loop until we receive some data and no more is waiting. */
-		do {
-			/* Harmless (get current temp) */
-			if(ret == 0) {
-				serial_write(serial, "M105\n", 5);
-			}
+	char serialbuf[SERIAL_BUFSIZE];
+	char gcodebuf[GCODE_BUFSIZE] = "";
+	int ret = 0;
+	int charsfound = 0;				/* N chars of CONFIRM_MSG found. */
+	size_t len;
+	while(1) {
+		debug("Polling...");
 #ifdef UNIX
-			ret = poll(fds, 1, SHORT_TIMEOUT);
+		ret = poll(fds, FD_COUNT, -1);
 #elif WINDOWS
-			switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, SHORT_TIMEOUT)) {
-			case WAIT_FAILED:
-				/* TODO: Get error */
-				ret = -1;
-				break;
+#error TODO: Modify windows code to poll stdin as well as serial.
+		switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, -1)) {
+		case WAIT_FAILED:
+			/* TODO: Get error */
+			ret = -1;
+			break;
 
-			case WAIT_TIMEOUT:
-				ret = 0;
-				break;
+		case WAIT_TIMEOUT:
+			ret = 0;
+			break;
 
-			case WAIT_OBJECT_0:
-				ret = 1;
-				break;
+		case WAIT_OBJECT_0:
+			ret = 1;
+			break;
 
-			default:
-				break;
-			}
+		default:
+			break;
+		}
+				
 #endif
+				
+		if(ret < 0) {
 			checkSignal();
-			if(ret < 0) {
-				checkSignal();
+			fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
+			fprintf(stderr, "Giving up.\n");
+			exit(EXIT_FAILURE);
+		}
 
-				fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
-				fprintf(stderr, "Giving up.\n");
-				exit(EXIT_FAILURE);
-			} else if(ret > 0) {
-				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
-				/* Scan for confirmation message */
-				int i;
-				for(i = 0; i < len; i++) {
-					if(readbuf[i] == CONFIRM_MSG[charsfound]) {
-						charsfound++;
-						if(charsfound >= strlen(CONFIRM_MSG)) {
-							almost = 1;
-							debug("Message receipt confirmed!");
-						}
-					} else {
-						charsfound = 0;
-					}
-				}
-			} else if(ret == 0) {
-				if(almost) {
-					ready = 1;
-				}
+		/* TODO: Windows */
+		if(fds[FD_SERIAL].revents & POLLIN) {
+			/* We've got reply data! */
+			debug("Got serial.");
+			len = serial_read(serial, serialbuf, sizeof(serialbuf)-1);
+			
+			if(verbose || interactive) {
+				fwrite(serialbuf, sizeof(char), len, stdout);
+				fflush(stdout);
 			}
-		} while(!ready);
-		if(noisy) {
-			printf("Ready!\n");
-		}
-	}
-
-
-	if(verbose && interactive) {
-		printf(PROMPT);
-	}
-
-	/* TODO: Use only poll so we can get input any time */
-	while(fgets(readbuf, sizeof(readbuf), input)) {
-		len = strlen(readbuf);
-		if(verbose && !interactive) {
-			printf("> %s", readbuf);
-		}
-
-		checkSignal();
-
-		debug("Writing to serial...");
-		serial_write(serial, readbuf, len);
-		if(readbuf[len-1] == '\n') {
-			debug("Wrote a complete line.");
-			/* Wait for 'ok' reply */
-			msg_confirmed = 0;
-			charsfound = 0;
-			while(1) {
-				debug("Polling serial...");
-#ifdef UNIX
-				ret = poll(fds, 1, -1);
-#elif WINDOWS
-				switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, -1)) {
-				case WAIT_FAILED:
-					/* TODO: Get error */
-					ret = -1;
-					break;
-
-				case WAIT_TIMEOUT:
-					ret = 0;
-					break;
-
-				case WAIT_OBJECT_0:
-					ret = 1;
-					break;
-
-				default:
-					break;
-				}
-				
-#endif
-				debugf("done (returned %d).", ret);
-				
-				if(ret < 0) {
-					checkSignal();
-
-					fprintf(stderr, "Error reading from serial: %s\n", strerror(errno));
-					fprintf(stderr, "Giving up.\n");
-					exit(EXIT_FAILURE);
-				} else if(ret == 0) {
-					if(msg_confirmed) {
-						/* We got what we wanted and no data remains. */
-						break;
-					} else {
-						fprintf(stderr, "Timed out waiting for recept confirmation, giving up.\n");
-						exit(EXIT_FAILURE);
-					}
-				}
-				
-				/* We've got data! */
-				debug("Reading data from serial...");
-				len = serial_read(serial, readbuf, sizeof(readbuf)-1);
-				readbuf[len] = '\0';
-				if(verbose) {
-					printf("%s", readbuf);
-				}
-				/* Scan for confirmation message */
-				int i;
-				for(i = 0; i < len; i++) {
-					if(readbuf[i] == CONFIRM_MSG[charsfound]) {
-						charsfound++;
-						if(charsfound >= strlen(CONFIRM_MSG)) {
-							msg_confirmed = 1;
-							debug("Message receipt confirmed!");
-						}
-					} else {
+			
+			/* Scan for confirmation message */
+			int i;
+			for(i = 0; i < len; i++) {
+				if(serialbuf[i] == CONFIRM_MSG[charsfound]) {
+					charsfound++;
+					if(charsfound >= strlen(CONFIRM_MSG)) {
+						/* Got confirmation, resume polling for and sending gcode. */
+						fds[FD_INPUT].events = POLLIN;
+						debug("Message receipt confirmed!");
 						charsfound = 0;
 					}
-				}
-				if(msg_confirmed) {
-					/* Disable timeout so we can quickly work through
-					 * remaining data. */
-					timeout = 0;
+				} else {
+					charsfound = 0;
 				}
 			}
 		}
 
-		if(verbose && interactive) {
-			printf(PROMPT);
+		/* TODO: Windows */
+		if(fds[FD_INPUT].revents & POLLIN) {
+			/* We've got input data! */
+			size_t lastlen = strlen(gcodebuf);
+			len = read(fds[FD_INPUT].fd, gcodebuf + lastlen, sizeof(gcodebuf) - lastlen - 1);
+			gcodebuf[len + lastlen] = '\0';
+
+			debug("Got gcode.");
+			/* If we got a line terminator, send the block. */
+			size_t point;
+			for(point = lastlen ? lastlen - 1 : 0; point < strlen(gcodebuf); ++point) {
+				if(gcodebuf[point] == '\n') {
+					serial_write(serial, gcodebuf, point);
+					debug("Sent complete block.");
+					/* We don't care about more input until receipt confirmed */
+					//fds[FD_INPUT].events = 0;
+					
+					if(verbose && !interactive) {
+						/* The terminal echos user input but not redirected input */
+						fwrite(gcodebuf, sizeof(char), point, stdout);
+						fflush(stdout);
+					}
+
+					/* Note that we continue looping. */
+					size_t newlen = len - (point - lastlen);
+					memmove(gcodebuf, &gcodebuf[point], newlen);
+					gcodebuf[newlen] = '\0';
+					point = 0;
+				}
+			}
+			if(len == 0) {
+				/* We're at EOF */
+				if(noisy) {
+					printf("Dump complete.\n");
+				}
+				exit(EXIT_SUCCESS);
+			}
 		}
-	}
-	if(verbose && interactive) {
-		printf("\n");
 	}
 
 	if(noisy) {
