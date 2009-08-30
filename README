@@ -44,7 +44,8 @@ Examples:
 gcgen -z xyz -l 50::
 
 # Produces gcode to linear-move to 12,17,42, then to 12,20,42.
-gcgen -l 12:17:42 -l :3:
+# (or 12,3,0 in absolute mode) (assumes starting at 0,0,0)
+gcgen -l 12,17,42 -l ,3,
 
 # Instructs a machine connected on /dev/ttyUSB0 to cease
 # extruding and shut off the heater.
