@@ -34,6 +34,7 @@
 #define GCODE_BUFSIZE 512		/* Standard states 256 chars max */
 #define SHORT_TIMEOUT 100
 #define CONFIRM_MSG "ok\r\n"
+#define DEFAULT_WRITEAHEAD 1	/* 0 is safer, but broken firmware cannot handle it. */
 
 #ifdef UNIX
 #define DEVPATH "/dev"
@@ -48,18 +49,15 @@
 #define FD_INPUT 0
 #define FD_SERIAL 1
 
-/* Total number of messages allowed to go unconfirmed. Regrettably necessary to
- * work around a critical fault in the current official firmware. */
-#define MSG_WRITEAHEAD 1
-
 #define HELP \
 	"" \
-	"\t-s\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n"		\
+	"\t-s speed\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n"		\
 	"\t-?\n" \
-	"\t-h\tDisplay this help message.\n" \
-	"\t-q\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
-	"\t-v\tVerbose: Prints serial I/O.\n" \
-    "\t-f\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
+	"\t-h\t\tDisplay this help message.\n" \
+	"\t-q\t\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
+	"\t-v\t\tVerbose: Prints serial I/O.\n" \
+	"\t-a writeahead\tNumber of additional messages to write before waiting for a flow control reply (\"ok\").  Lower values are safer: 0 is the ideal value for this parameter. However, it currently defaults to 1 to maintain support for the currently broken official Sanguino firmware.\n" \
+    "\t-f file\t\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
 void checkSignal() 
@@ -73,7 +71,7 @@ void checkSignal()
 }
 
 void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-f <gcode file>] [serial device]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-a writeahead] [-f <gcode file>] [serial device]\n", argv[0]);
 }
 
 char* guessSerial() 
@@ -180,9 +178,10 @@ int main(int argc, char** argv)
 	int noisy = 1;
 	int verbose = 0;
 	int interactive = isatty(STDIN_FILENO);
+	unsigned writeahead = DEFAULT_WRITEAHEAD;
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "h?qvs:f:")) >= 0) {
+		while ((opt = getopt(argc, argv, "h?qvs:f:a:")) >= 0) {
 			switch(opt) {
 			case 's':			/* Speed */
 				speed = strtol(optarg, NULL, 10);
@@ -198,6 +197,10 @@ int main(int argc, char** argv)
 
 			case 'v':			/* Verbose */
 				verbose = 1;
+				break;
+
+			case 'a':
+				writeahead = strtol(optarg, NULL, 10);
 				break;
 
 			case '?':			/* Help */
@@ -365,7 +368,7 @@ int main(int argc, char** argv)
 					serial_write(serial, gcodebuf, point);
 					unconfirmed++;
 					debug("Sent complete block.");
-					if(unconfirmed > MSG_WRITEAHEAD) {
+					if(unconfirmed > writeahead) {
 						/* We don't care about more input until receipt confirmed */
 						fds[FD_INPUT].events = 0;
 					}
