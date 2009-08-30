@@ -284,10 +284,11 @@ int main(int argc, char** argv)
 #endif
 
 	char serialbuf[SERIAL_BUFSIZE];
-	char gcodebuf[GCODE_BUFSIZE] = "";
+	char gcodebuf[GCODE_BUFSIZE];
 	int ret = 0;
 	int charsfound = 0;				/* N chars of CONFIRM_MSG found. */
 	size_t len;
+	size_t gcode_lastlen = 0;
 	unsigned unconfirmed = 0;
 	while(1) {
 		debug("Polling...");
@@ -356,20 +357,20 @@ int main(int argc, char** argv)
 		/* TODO: Windows */
 		if(fds[FD_INPUT].revents & POLLIN) {
 			/* We've got input data! */
-			size_t lastlen = strlen(gcodebuf);
-			len = read(fds[FD_INPUT].fd, gcodebuf + lastlen, sizeof(gcodebuf) - lastlen - 1);
-			gcodebuf[len + lastlen] = '\0';
+			len = read(fds[FD_INPUT].fd, gcodebuf + gcode_lastlen, sizeof(gcodebuf) - gcode_lastlen - 1);
+			gcodebuf[len + gcode_lastlen] = '\0';
 
 			debug("Got gcode.");
 			/* If we got a line terminator, send the block. */
-			size_t point;
-			for(point = lastlen ? lastlen - 1 : 0; point < strlen(gcodebuf); ++point) {
+			size_t point = gcode_lastlen ? gcode_lastlen - 1 : 0;
+			size_t end = gcode_lastlen + len;
+			for(; point < end; ++point) {
 				if(gcodebuf[point] == '\n') {
 					serial_write(serial, gcodebuf, point);
 					unconfirmed++;
 					debug("Sent complete block.");
 					if(unconfirmed > writeahead) {
-						/* We don't care about more input until receipt confirmed */
+						/* We've sent enough; wait for confirmation messages now. */
 						fds[FD_INPUT].events = 0;
 					}
 					
@@ -379,13 +380,15 @@ int main(int argc, char** argv)
 						fflush(stdout);
 					}
 
-					/* Note that we continue looping. */
-					size_t newlen = len - (point - lastlen);
-					memmove(gcodebuf, &gcodebuf[point], newlen);
-					gcodebuf[newlen] = '\0';
+					/* (Note that we continue looping.) */
+					/* Move unsent gcode to the start of the buffer. */
+					len = len - (point - gcode_lastlen);
+					memmove(gcodebuf, &gcodebuf[point], len);
 					point = 0;
+					end = len;
 				}
 			}
+			gcode_lastlen = len;
 			if(len == 0) {
 				/* We're at EOF */
 				if(noisy) {
