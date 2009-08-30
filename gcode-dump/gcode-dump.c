@@ -38,7 +38,6 @@
 #ifdef UNIX
 #define DEVPATH "/dev"
 #define DEVPREFIX "ttyUSB"
-#define DEVPREFIX_LEN 6
 #elif WINDOWS
 #define DEVPREFIX "COM"
 #define MAX_SERIAL_GUESSES 10
@@ -48,6 +47,10 @@
 /* Must be sequential from 0 to FD_COUNT-1 */
 #define FD_INPUT 0
 #define FD_SERIAL 1
+
+/* Total number of messages allowed to go unconfirmed. Regrettably necessary to
+ * work around a critical fault in the current official firmware. */
+#define MSG_WRITEAHEAD 1
 
 #define HELP \
 	"" \
@@ -87,7 +90,7 @@ char* guessSerial()
 	if(d) {
 		struct dirent *entry;
 		while((entry = readdir(d))) {
-			if(strncmp(entry->d_name, DEVPREFIX, DEVPREFIX_LEN) == 0) {
+			if(strncmp(entry->d_name, DEVPREFIX, strlen(DEVPREFIX)) == 0) {
 				found = 1;
 				strcpy(dev, entry->d_name);
 			}
@@ -282,6 +285,7 @@ int main(int argc, char** argv)
 	int ret = 0;
 	int charsfound = 0;				/* N chars of CONFIRM_MSG found. */
 	size_t len;
+	unsigned unconfirmed = 0;
 	while(1) {
 		debug("Polling...");
 #ifdef UNIX
@@ -332,6 +336,9 @@ int main(int argc, char** argv)
 				if(serialbuf[i] == CONFIRM_MSG[charsfound]) {
 					charsfound++;
 					if(charsfound >= strlen(CONFIRM_MSG)) {
+						if(unconfirmed > 0) { /* Sanity check */
+							unconfirmed--;
+						}
 						/* Got confirmation, resume polling for and sending gcode. */
 						fds[FD_INPUT].events = POLLIN;
 						debug("Message receipt confirmed!");
@@ -356,9 +363,12 @@ int main(int argc, char** argv)
 			for(point = lastlen ? lastlen - 1 : 0; point < strlen(gcodebuf); ++point) {
 				if(gcodebuf[point] == '\n') {
 					serial_write(serial, gcodebuf, point);
+					unconfirmed++;
 					debug("Sent complete block.");
-					/* We don't care about more input until receipt confirmed */
-					//fds[FD_INPUT].events = 0;
+					if(unconfirmed > MSG_WRITEAHEAD) {
+						/* We don't care about more input until receipt confirmed */
+						fds[FD_INPUT].events = 0;
+					}
 					
 					if(verbose && !interactive) {
 						/* The terminal echos user input but not redirected input */
