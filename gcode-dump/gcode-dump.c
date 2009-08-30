@@ -34,7 +34,7 @@
 #define GCODE_BUFSIZE 512		/* Standard states 256 chars max */
 #define SHORT_TIMEOUT 100
 #define CONFIRM_MSG "ok\r\n"
-#define DEFAULT_WRITEAHEAD 1	/* 0 is safer, but broken firmware cannot handle it. */
+#define DEFAULT_WRITEAHEAD 0	/* 0 is safer, but broken firmware cannot handle it. */
 
 #ifdef UNIX
 #define DEVPATH "/dev"
@@ -56,7 +56,7 @@
 	"\t-h\t\tDisplay this help message.\n" \
 	"\t-q\t\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
 	"\t-v\t\tVerbose: Prints serial I/O.\n" \
-	"\t-a writeahead\tNumber of additional messages to write before waiting for a flow control reply (\"ok\").  Lower values are safer: 0 is the ideal value for this parameter. However, it currently defaults to 1 to maintain support for the currently broken official Sanguino firmware.\n" \
+	"\t-a writeahead\tNumber of additional messages to write before waiting for a flow control reply (\"ok\").\n" \
     "\t-f file\t\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
@@ -324,6 +324,7 @@ int main(int argc, char** argv)
 		}
 
 		/* TODO: Windows */
+		/* FIXME: Why are replies shifted forwards by one? */
 		if(fds[FD_SERIAL].revents & POLLIN) {
 			/* We've got reply data! */
 			debug("Got serial.");
@@ -357,6 +358,9 @@ int main(int argc, char** argv)
 		/* TODO: Windows */
 		if(fds[FD_INPUT].revents & POLLIN) {
 			/* We've got input data! */
+			/* TODO: Read char-at-a-time instead of in-bulk-then-loop
+			 * to avoid reading more blocks than we want to deal with
+			 * at once */
 			len = read(fds[FD_INPUT].fd, gcodebuf + gcode_lastlen, sizeof(gcodebuf) - gcode_lastlen - 1);
 			gcodebuf[len + gcode_lastlen] = '\0';
 
