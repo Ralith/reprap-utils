@@ -405,9 +405,9 @@ int main(int argc, char** argv)
 				}
 
 			case ';':
-				gccomment = 1;
-				break;
-
+				if(compress) {
+					gccomment = 1;
+				}
 			case ' ':
 			case '\t':
 				if(compress) {
