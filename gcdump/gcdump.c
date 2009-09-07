@@ -34,6 +34,7 @@
 #define GCODE_BUFSIZE 512		/* Standard states 256 chars max */
 #define SHORT_TIMEOUT 100
 #define CONFIRM_MSG "ok\r\n"
+#define START_MSG "start\r\n"
 #define DEFAULT_WRITEAHEAD 0	/* 0 is safer, but broken firmware cannot handle it. */
 
 #ifdef UNIX
@@ -286,7 +287,8 @@ int main(int argc, char** argv)
 	char serialbuf[SERIAL_BUFSIZE];
 	char gcodebuf[GCODE_BUFSIZE];
 	int ret = 0;
-	int charsfound = 0;				/* N chars of CONFIRM_MSG found. */
+	int confpoint = 0;				/* N chars of CONFIRM_MSG found. */
+	int startpoint = 0;				/* N chars of START_MSG found. */
 	size_t len;
 	size_t gcpoint = 0;
 	int gccomment = 0;
@@ -339,19 +341,32 @@ int main(int argc, char** argv)
 			/* Scan for confirmation message */
 			int i;
 			for(i = 0; i < len; i++) {
-				if(serialbuf[i] == CONFIRM_MSG[charsfound]) {
-					charsfound++;
-					if(charsfound >= strlen(CONFIRM_MSG)) {
+				if(serialbuf[i] == CONFIRM_MSG[confpoint]) {
+					confpoint++;
+					if(confpoint >= strlen(CONFIRM_MSG)) {
 						if(unconfirmed > 0) { /* Sanity check */
 							unconfirmed--;
 						}
 						/* Got confirmation, resume polling for and sending gcode. */
 						fds[FD_INPUT].events = POLLIN;
 						debug("Message receipt confirmed!");
-						charsfound = 0;
+						confpoint = 0;
 					}
 				} else {
-					charsfound = 0;
+					confpoint = 0;
+					if(serialbuf[i] == START_MSG[startpoint]) {
+						startpoint++;
+						if(startpoint >= strlen(START_MSG) && unconfirmed) {
+							debug("Machine started.");
+							/* Machine just started, and thus hasn't been
+							 * listening, so we have to resend the last block. */
+							serial_write(serial, gcodebuf, gcpoint);
+							serial_write(serial, "\r\n", 2);
+							debug("Resent last block.");
+						}
+					} else {
+						startpoint = 0;
+					}
 				}
 			}
 		}
