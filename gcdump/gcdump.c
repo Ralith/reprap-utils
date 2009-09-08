@@ -349,6 +349,8 @@ int main(int argc, char** argv)
 						}
 						/* Got confirmation, resume polling for and sending gcode. */
 						fds[FD_INPUT].events = POLLIN;
+						/* Clear gcode buffer for next message */
+						gcpoint = 0;
 						debug("Message receipt confirmed!");
 						confpoint = 0;
 					}
@@ -411,8 +413,6 @@ int main(int argc, char** argv)
 						printf("\n");
 					}
 					
-					gcpoint = 0;
-
 					/* Stop polling input until we have confirmation */
 					fds[FD_INPUT].events = 0;
 
