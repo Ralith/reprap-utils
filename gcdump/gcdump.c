@@ -356,19 +356,20 @@ int main(int argc, char** argv)
 					}
 				} else {
 					confpoint = 0;
-					if(serialbuf[i] == START_MSG[startpoint]) {
-						startpoint++;
-						if(startpoint >= strlen(START_MSG) && unconfirmed) {
-							debug("Machine started.");
-							/* Machine just started, and thus hasn't been
-							 * listening, so we have to resend the last block. */
-							serial_write(serial, gcodebuf, gcpoint);
-							serial_write(serial, "\r\n", 2);
-							debug("Resent last block.");
-						}
-					} else {
-						startpoint = 0;
+				}
+				
+				if(serialbuf[i] == START_MSG[startpoint]) {
+					startpoint++;
+					if(startpoint >= strlen(START_MSG) && unconfirmed) {
+						debug("Machine started.");
+						/* Machine just started, and thus hasn't been
+						 * listening, so we have to resend the last block. */
+						serial_write(serial, gcodebuf, gcpoint);
+						serial_write(serial, "\r\n", 2);
+						debug("Resent last block.");
 					}
+				} else {
+					startpoint = 0;
 				}
 			}
 		}
