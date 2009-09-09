@@ -375,7 +375,8 @@ int main(int argc, char** argv)
 		}
 
 		/* TODO: Windows */
-		if(fds[FD_INPUT].revents & POLLIN) {
+		/* POLLHUP handles some stdin EOF situations missed by POLLIN */
+		if(fds[FD_INPUT].revents & POLLIN || fds[FD_INPUT].revents & POLLHUP) {
 			/* We've got input data! */
 			int ret;
 			char ch;
