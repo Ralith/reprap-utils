@@ -293,6 +293,7 @@ int main(int argc, char** argv)
 	size_t gcpoint = 0;
 	int gccomment = 0;
 	unsigned unconfirmed = 0;
+	int inputdone = 0;
 	while(1) {
 		debug("Polling...");
 #ifdef UNIX
@@ -353,6 +354,10 @@ int main(int argc, char** argv)
 						gcpoint = 0;
 						debug("Message receipt confirmed!");
 						confpoint = 0;
+
+						if(inputdone && unconfirmed == 0) {
+							exit(EXIT_SUCCESS);
+						}
 					}
 				} else {
 					confpoint = 0;
@@ -385,9 +390,11 @@ int main(int argc, char** argv)
 			if(ret == 0) {
 				/* We're at EOF */
 				if(noisy) {
-					printf("Got EOF; dump complete.\n");
-				}
-				exit(EXIT_SUCCESS);
+					printf("Got EOF; input complete.\n");
+				}				
+				fds[FD_INPUT].events = 0;
+				inputdone = 1;
+				continue;
 			} else if(ret < 0) {
 				/* Something went wrong */
 				checkSignal();
