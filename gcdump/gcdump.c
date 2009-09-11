@@ -302,7 +302,7 @@ int main(int argc, char** argv)
 				debug("Last message confirmed, exiting.");
 				exit(EXIT_SUCCESS);
 			}
-			ret = poll(fds[FD_SERIAL], 1, -1);
+			ret = poll(&fds[FD_SERIAL], 1, -1);
 		} else {
 			ret = poll(fds, FD_COUNT, -1);
 		}
