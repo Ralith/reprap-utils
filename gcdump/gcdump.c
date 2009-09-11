@@ -297,7 +297,15 @@ int main(int argc, char** argv)
 	while(1) {
 		debug("Polling...");
 #ifdef UNIX
-		ret = poll(fds, FD_COUNT, -1);
+		if(inputdone) {
+			if(unconfirmed == 0) {
+				debug("Last message confirmed, exiting.");
+				exit(EXIT_SUCCESS);
+			}
+			ret = poll(fds[FD_SERIAL], 1, -1);
+		} else {
+			ret = poll(fds, FD_COUNT, -1);
+		}
 #elif WINDOWS
 #error TODO: Modify windows code to poll stdin as well as serial.
 		switch(WaitForMultipleObjects(1, &(serial->handle), FALSE, -1)) {
@@ -345,6 +353,7 @@ int main(int argc, char** argv)
 				if(serialbuf[i] == CONFIRM_MSG[confpoint]) {
 					confpoint++;
 					if(confpoint >= strlen(CONFIRM_MSG)) {
+						debug("Message receipt confirmed!");
 						if(unconfirmed > 0) { /* Sanity check */
 							unconfirmed--;
 						}
@@ -352,12 +361,8 @@ int main(int argc, char** argv)
 						fds[FD_INPUT].events = POLLIN;
 						/* Clear gcode buffer for next message */
 						gcpoint = 0;
-						debug("Message receipt confirmed!");
+						
 						confpoint = 0;
-
-						if(inputdone && unconfirmed == 0) {
-							exit(EXIT_SUCCESS);
-						}
 					}
 				} else {
 					confpoint = 0;
@@ -414,7 +419,8 @@ int main(int argc, char** argv)
 
 					serial_write(serial, gcodebuf, gcpoint);
 					serial_write(serial, "\r\n", 2);
-
+					unconfirmed++;
+					
 					debug("Sent complete block.");
 
 					if(verbose && !interactive) {
