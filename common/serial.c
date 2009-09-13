@@ -101,7 +101,7 @@ int serial_init(int fd, long speed) {
 		return SERIAL_INVALID_FILEDESC;
 	}
 
-	// Set speed
+	/* Set speed */
 	{
 		speed_t cfspeed = ntocf(speed);
 		if(cfsetispeed(&attribs, cfspeed) < 0) {
@@ -114,7 +114,7 @@ int serial_init(int fd, long speed) {
 		serial_set_attrib(fd, &attribs);
 	}
 
-	// Set non-canonical mode
+	/* Set non-canonical mode */
 	int status;
 	attribs.c_cc[VTIME] = 0;
 	if((status = serial_set_attrib(fd, &attribs)) < 0) {
@@ -128,6 +128,14 @@ int serial_init(int fd, long speed) {
 	if((status = serial_set_attrib(fd, &attribs)) < 0) {
 		return status;
 	}
+
+	/* Prevents DTR from being dropped, resetting the MCU when using
+	 * an Arduino bootloader */
+	attribs.c_cflag &= ~HUPCL;
+	if((status = serial_set_attrib(fd, &attribs)) < 0) {
+		return status;
+	}
+
 	return SERIAL_NO_ERROR;
 }
 
