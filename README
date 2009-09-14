@@ -31,6 +31,11 @@ gcdump /dev/ttyUSB0
 G1 X10 Y10 Z0
 ^D
 
+# Prints current extruder temperature
+echo M105 | gcdump -v | grep "T:" | cut -b 3-
+
+# Continuously prints current extruder temperature; useful for monitoring warmup.
+yes M105 | gcdump -v | grep "T:" | cut -b 3-
 
 =============
 gcgen
