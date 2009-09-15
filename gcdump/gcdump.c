@@ -394,9 +394,7 @@ int main(int argc, char** argv)
 			
 			if(ret == 0) {
 				/* We're at EOF */
-				if(noisy) {
-					printf("Got EOF; input complete.\n");
-				}				
+				debug("Got EOF; input complete.\n");
 				fds[FD_INPUT].events = 0;
 				inputdone = 1;
 				continue;
