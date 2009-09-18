@@ -58,6 +58,7 @@
 	"\t-q\t\tQuiet/noninteractive mode; no output unless an error occurs.\n" \
 	"\t-v\t\tVerbose: Prints serial I/O.\n" \
 	"\t-c\t\tFilter out non-meaningful chars. May stress noncompliant gcode interpreters.\n" \
+	"\t-u number\tMaximum number of messages to send without receipt confirmation.  Unsafe, but necessary for certain broken firmware." \
     "\t-f file\t\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
@@ -72,7 +73,7 @@ void checkSignal()
 }
 
 void usage(int argc, char** argv) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-c] [-f <gcode file>] [serial device]\n", argv[0]);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-q] [-v] [-c] [-u <number>] [-f <gcode file>] [serial device]\n", argv[0]);
 }
 
 char* guessSerial() 
@@ -180,9 +181,10 @@ int main(int argc, char** argv)
 	int verbose = 0;
 	int compress = 0;
 	int interactive = isatty(STDIN_FILENO);
+	unsigned max_unconfirmed = 0;
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "h?qvcs:f:")) >= 0) {
+		while ((opt = getopt(argc, argv, "h?qvcs:u:f:")) >= 0) {
 			switch(opt) {
 			case 's':			/* Speed */
 				speed = strtol(optarg, NULL, 10);
@@ -190,6 +192,10 @@ int main(int argc, char** argv)
 
 			case 'f':
 				filepath = optarg;
+				break;
+
+			case 'u':
+				max_unconfirmed = strtol(optarg, NULL, 10);
 				break;
 
 			case 'q':			/* Quiet */
@@ -371,7 +377,7 @@ int main(int argc, char** argv)
 				if(serialbuf[i] == START_MSG[startpoint]) {
 					startpoint++;
 					if(startpoint >= strlen(START_MSG) && unconfirmed) {
-						debug("Machine started.");
+						debug("Machine was reset.");
 						/* Machine just started, and thus hasn't been
 						 * listening, so we have to resend the last block. */
 						serial_write(serial, gcodebuf, gcpoint);
@@ -425,9 +431,11 @@ int main(int argc, char** argv)
 						fwrite(gcodebuf, sizeof(char), gcpoint, stdout);
 						printf("\n");
 					}
-					
-					/* Stop polling input until we have confirmation */
-					fds[FD_INPUT].events = 0;
+
+					if(unconfirmed > max_unconfirmed) {
+						/* Stop polling input until we have some confirmation */
+						fds[FD_INPUT].events = 0;
+					}
 
 					break;
 				}
