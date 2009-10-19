@@ -21,3 +21,4 @@ add_subdirectory(common)
 
 add_subdirectory(gcdump)
 add_subdirectory(gcgen)
+add_subdirectory(gcview)
