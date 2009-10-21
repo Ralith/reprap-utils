@@ -258,9 +258,9 @@ int main(int argc, char **argv)
 			case 'e':
 				if(strcasecmp(optarg, "on") == 0) {
 					gcode_append(&tail, "M101");
-				} else if(strcasecmp(optarg, "reverse")) {
+				} else if(strcasecmp(optarg, "reverse")==0) {
 					gcode_append(&tail, "M102");
-				} else if(strcasecmp(optarg, "off")) {
+				} else if(strcasecmp(optarg, "off")==0) {
 					gcode_append(&tail, "M103");
 				} else {
 					fprintf(stderr, "Argument to extrude must be one of on, reverse, or off.\n");
