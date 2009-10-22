@@ -2,7 +2,7 @@ project(reprap-tools)
 
 cmake_minimum_required(VERSION 2.4.6)
 
-add_definitions( -Wall )
+add_definitions( -Wall -Wextra )
 
 if(UNIX)
   add_definitions(-DUNIX)
