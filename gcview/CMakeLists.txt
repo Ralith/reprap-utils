@@ -4,7 +4,7 @@ if(SDL_FOUND)
   add_executable(gcview
     gcview.c)
 
-  include_directories(${SDL_INCLUDE_DIRS})
+  include_directories(${SDL_INCLUDE_DIR})
   target_link_libraries(gcview ${SDL_LIBRARIES})
 
   install(TARGETS gcview DESTINATION bin)
