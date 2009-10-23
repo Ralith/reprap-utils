@@ -293,8 +293,8 @@ int main(int argc, char** argv)
 	char serialbuf[SERIAL_BUFSIZE];
 	char gcodebuf[GCODE_BUFSIZE];
 	int ret = 0;
-	int confpoint = 0;				/* N chars of CONFIRM_MSG found. */
-	int startpoint = 0;				/* N chars of START_MSG found. */
+	size_t confpoint = 0;				/* N chars of CONFIRM_MSG found. */
+	size_t startpoint = 0;				/* N chars of START_MSG found. */
 	size_t len;
 	size_t gcpoint = 0;
 	int gccomment = 0;
@@ -354,7 +354,7 @@ int main(int argc, char** argv)
 			}
 			
 			/* Scan for confirmation message */
-			int i;
+			size_t i;
 			for(i = 0; i < len; i++) {
 				if(serialbuf[i] == CONFIRM_MSG[confpoint]) {
 					confpoint++;
