@@ -1,33 +1,116 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 
-#include "SDL.h"
-#include "SDL_opengl.h"
+#include <GL/gl.h>
+#include <GL/glut.h>
 
-int main(int argc, char** argv) 
-{
-	if(SDL_Init(SDL_INIT_VIDEO) != 0) {
-		fprintf(stderr, "Unable to initialize SDL: %s\n", SDL_GetError());
-		exit(EXIT_FAILURE);
-	}
-	atexit(SDL_Quit);
-	
-	SDL_WM_SetCaption("gcode viewer", "gcview");
+#define DEFAULT_W 640
+#define DEFAULT_H 480
 
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_Surface *screen = SDL_SetVideoMode(640, 480, 0, SDL_OPENGL | SDL_RESIZABLE);
+#define FRAME_DELAY 17          /* 1/(17ms) = about 60FPS */
 
-	int running = 1;
-	while(running) {
-		SDL_Event e;
-		while(SDL_PollEvent(&e)) {
-			switch(e.type) {
-			case SDL_QUIT:
-				running = 0;
-			}
-		}
-	}
+#define MOTION_INCREMENT 10
+
+char rerender;                  /* Do we currently need to rerender? */
+
+struct {
+    float pan;
+    float pitch;
+    float radius;
+} camera;
+
+/* Render the current state of affairs */
+void render(void) {
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glColor3f(1.0, 1.0, 1.0);   /* set current color to white */
+    glBegin(GL_POLYGON);        /* draw filled triangle */
+    glVertex2i(200,125);        /* specify each vertex of triangle */
+    glVertex2i(100,375);
+    glVertex2i(300,375);
+    glEnd();                    /* OpenGL draws the filled triangle */
+    glutSwapBuffers();
+
+    rerender = 0;               /* Image is now up to date */
+}
+
+void idle(int ignored) {
+    if(rerender) {
+        render();
+    }
+    
+    glutTimerFunc(FRAME_DELAY, idle, 0);
+}
+
+void resize(int width, int height) {
+    rerender = 1;
+    glViewport(0, 0, width, height);
+}
+
+void special_key(int key, int x, int y) {
+    rerender = 1;
+    switch(key) {
+    case GLUT_KEY_LEFT:
+        camera.pan -= MOTION_INCREMENT;
+        break;
+
+    case GLUT_KEY_RIGHT:
+        camera.pan += MOTION_INCREMENT;
+        break;
+
+    case GLUT_KEY_DOWN:
+        camera.pitch -= MOTION_INCREMENT;
+        break;
+
+    case GLUT_KEY_UP:
+        camera.pitch += MOTION_INCREMENT;
+        break;
+        
+    default:
+        rerender = 0;
+    }   
+}
+
+int main(int argc, char** argv) {
+    glutInit(&argc, argv);
+
+    /* TODO: Validate arguments */
+    
+    /* Create window */
+    {
+        glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_MULTISAMPLE);
+        glutInitWindowSize(DEFAULT_W, DEFAULT_H);
+
+        /* Build title string */
+        size_t titlelen = strlen(argv[0]);
+        int i;
+        for(i = 1; i < argc; ++i) {
+            /* Include room for a space */
+            titlelen += 1 + strlen(argv[i]);
+        }
+        char *title = malloc(titlelen);
+        *title = '\0';
+        strcat(title, argv[0]);
+        for(i = 1; i < argc; ++i) {
+            strcat(title, " ");
+            strcat(title, argv[i]);
+        }
+        
+        glutCreateWindow(title);
+    }
+
+	/* Configure OpenGL */
+	glClearColor(0, 0, 0, 0);
+
+    /* Prepare for mainloop */
+    glutReshapeFunc(resize);
+    glutSpecialFunc(special_key);
+    rerender = 0;
+
+    /* Enter main loop */
+    idle(0);
+    glutMainLoop();
 
 	exit(EXIT_SUCCESS);
 }
