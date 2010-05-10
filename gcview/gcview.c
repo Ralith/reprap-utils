@@ -16,8 +16,8 @@
 char rerender;                  /* Do we currently need to rerender? */
 
 struct {
-    float pan;
-    float pitch;
+    float latitude;
+    float longitude;
     float radius;
 } camera;
 
@@ -52,19 +52,19 @@ void special_key(int key, int x, int y) {
     rerender = 1;
     switch(key) {
     case GLUT_KEY_LEFT:
-        camera.pan -= MOTION_INCREMENT;
+        camera.longitude -= MOTION_INCREMENT;
         break;
 
     case GLUT_KEY_RIGHT:
-        camera.pan += MOTION_INCREMENT;
+        camera.longitude += MOTION_INCREMENT;
         break;
 
     case GLUT_KEY_DOWN:
-        camera.pitch -= MOTION_INCREMENT;
+        camera.latitude -= MOTION_INCREMENT;
         break;
 
     case GLUT_KEY_UP:
-        camera.pitch += MOTION_INCREMENT;
+        camera.latitude += MOTION_INCREMENT;
         break;
         
     default:
