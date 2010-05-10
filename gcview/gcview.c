@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 
 #include <GL/gl.h>
 #include <GL/glut.h>
@@ -11,7 +12,7 @@
 
 #define FRAME_DELAY 17          /* 1/(17ms) = about 60FPS */
 
-#define MOTION_INCREMENT 10
+#define MOTION_INCREMENT (M_PI/5)
 
 char rerender;                  /* Do we currently need to rerender? */
 
