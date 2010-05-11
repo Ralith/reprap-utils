@@ -99,6 +99,7 @@ int main(int argc, char** argv) {
         }
         
         glutCreateWindow(title);
+        free(title);
     }
 
 	/* Configure OpenGL */
