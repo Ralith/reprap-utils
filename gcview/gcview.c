@@ -50,26 +50,29 @@ void resize(int width, int height) {
 }
 
 void special_key(int key, int x, int y) {
-    rerender = 1;
     switch(key) {
     case GLUT_KEY_LEFT:
         camera.longitude -= MOTION_INCREMENT;
+        rerender = 1;
         break;
 
     case GLUT_KEY_RIGHT:
         camera.longitude += MOTION_INCREMENT;
+        rerender = 1;
         break;
 
     case GLUT_KEY_DOWN:
         camera.latitude -= MOTION_INCREMENT;
+        rerender = 1;
         break;
 
     case GLUT_KEY_UP:
         camera.latitude += MOTION_INCREMENT;
+        rerender = 1;
         break;
-        
+
     default:
-        rerender = 0;
+        break;
     }   
 }
 
