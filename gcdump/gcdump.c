@@ -33,8 +33,8 @@
 #define SERIAL_BUFSIZE 128
 #define GCODE_BUFSIZE 512		/* Standard states 256 chars max */
 #define SHORT_TIMEOUT 100
-#define CONFIRM_MSG "ok\r\n"
-#define START_MSG "start\r\n"
+#define CONFIRM_MSG "ok"
+#define START_MSG "start"
 #define DEFAULT_WRITEAHEAD 0	/* 0 is safer, but broken firmware cannot handle it. */
 
 #ifdef UNIX
