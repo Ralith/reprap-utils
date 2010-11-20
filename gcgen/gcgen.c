@@ -77,19 +77,13 @@ void gcode_append(gcode_cmd **tail, char *new)
 int isnum(char *str) 
 {
 	size_t i;
+  size_t len = strlen(str);
 	int points = 0;
-  int neg = 0;
-  int exp = 0;
   /* TODO: Better checks. */
-	for(i = 0; i < strlen(str); i++) {
+  i = ((str[0] == '-' && len > 1) ? 1 : 0);
+	for(; i < strlen(str); i++) {
 		if((str[i] > '9' || str[i] < '0')) {
 			switch(str[i]) {
-      case '-':
-        if(neg++ != 0) {
-          return 0;
-        }
-        break;
-        
       case '.':
         if(points++ != 0) {
           return 0;
@@ -98,10 +92,12 @@ int isnum(char *str)
 
       case 'e':
       case 'E':
-        if(exp++ != 0) {
-          return 0;
+        if(i < (len - 1)) {
+          return isnum(str + i + 1);
         }
+        return 0;
         break;
+        
       default:
         return 0;
       }
