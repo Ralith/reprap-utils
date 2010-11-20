@@ -78,17 +78,34 @@ int isnum(char *str)
 {
 	size_t i;
 	int points = 0;
+  int neg = 0;
+  int exp = 0;
+  /* TODO: Better checks. */
 	for(i = 0; i < strlen(str); i++) {
 		if((str[i] > '9' || str[i] < '0')) {
-			if(str[i] == '.') {
-				/* Only one '.' allowed */
-				if(points++ > 1) {
-					return 0;
-				}
-			} else {
-				return 0;
-			}
-		}	
+			switch(str[i]) {
+      case '-':
+        if(neg++ != 0) {
+          return 0;
+        }
+        break;
+        
+      case '.':
+        if(points++ != 0) {
+          return 0;
+        }
+        break;
+
+      case 'e':
+      case 'E':
+        if(exp++ != 0) {
+          return 0;
+        }
+        break;
+      default:
+        return 0;
+      }
+		}
 	}
 	return 1;
 }
