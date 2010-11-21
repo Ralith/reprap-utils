@@ -260,7 +260,7 @@ int main(int argc, char** argv)
 	/* Open FDs */
 	serial = serial_open(devpath, speed);
 	if(serial == NULL) {
-		fprintf(stderr, "Error opening serial device %s: %s\n", devpath, serial_strerror(serial_errno));
+		fprintf(stderr, "Error opening serial device %s: %s\n", devpath, strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
