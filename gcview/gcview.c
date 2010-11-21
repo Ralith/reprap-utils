@@ -246,12 +246,19 @@ void update(gcblock *head) {
   glEndList();
 }
 
+void cleanup(void) {
+  if(gcsource != STDIN_FILENO) {
+    close(gcsource);
+  }
+}
+
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
 
   {
     /* Work out what we're reading from */
     gcsource = STDIN_FILENO;
+    atexit(cleanup);
     if(argc > 1) {
       gcsource = open(argv[1], O_RDONLY);
       if(gcsource < 0) {
