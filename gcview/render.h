@@ -1,3 +1,3 @@
 #include "../common/gcode.h"
 
-point render_words(gcblock *head, point root);
+void render_words(gcblock *head, point *toolpos);

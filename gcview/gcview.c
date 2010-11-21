@@ -15,6 +15,7 @@
 #include <GL/glut.h>
 
 #include "../common/gcode.h"
+#include "render.h"
 
 #define DEFAULT_W 640
 #define DEFAULT_H 480
@@ -70,24 +71,23 @@ void draw(int ignored) {
 }
 
 void update(gcblock *head) {
-  const point root = {0.0, 0.0, 0.0};
+  point root = {0.0, 0.0, 0.0};
   
   if(glIsList(dlist)) {
     glDeleteLists(dlist, 1);
   }
   dlist = glGenLists(1);
   glNewList(dlist, GL_COMPILE);
-  
-  render_words(head, root);
-
+  if(head) {
+    render_words(head, &root);
+  }
   glEndList();
 }
 
-void readgcode(int ignored) {
+void readgcode() {
   static char gcbuf[GCODE_BLOCKSIZE];
   static gcblock *head = 0, *tail = 0;
-  static struct timeval timeout = {0, 0};
-  static char done = 0;
+  static struct timeval timeout = {0, (FRAME_DELAY*1000)};
   static unsigned blockidx = 1, real_line = 0;
   static unsigned sofar = 0;
 
@@ -107,63 +107,58 @@ void readgcode(int ignored) {
         perror("read");
         exit(EXIT_FAILURE);
       } else if(bytes == 0) {
-        /* We got an EOF. */
-        done = 1;
-      } else {
-        size_t i = sofar;
-        size_t block_start = 0;
-        const size_t end = sofar+bytes;
-        /* Parse any and all blocks */
-        for(; i < end; ++i) {
-          if(gcbuf[i] == '\n' || gcbuf[i] == '\r') {
-            /* gcbuf[i] = '\0'; */
-            const size_t len = i - block_start;
-            if(gcbuf[i] == '\n') {
-              real_line++;
-            }
-            if(len < 1) {
-              /* Skip empty lines */
-              continue;
-            }
-            gcblock *block = parse_block(gcbuf + block_start, len);
-            /* printf("Found line: \"%s\"\n", gcbuf + block_start); */
-            block_start = i + 1;
-
-            if(!block) {
-              fprintf(stderr, "WARNING: Skipping malformed block\n");
-              continue;
-            }
-
-            block->real_line = real_line;
-            block->index = blockidx++;
-
-            /* Append to block list */
-            if(head) {
-              tail->next = block;
-            } else {
-              head = block;
-            }
-            tail = block;
-
-            /* Update display list */
-            update(head);
+        /* We got an EOF, no need to run any more */
+        glutIdleFunc(NULL);
+        return;
+      }
+      size_t i = sofar;
+      size_t block_start = 0;
+      const size_t end = sofar+bytes;
+      /* Parse any and all blocks */
+      for(; i < end; ++i) {
+        if(gcbuf[i] == '\n' || gcbuf[i] == '\r') {
+          /* gcbuf[i] = '\0'; */
+          const size_t len = i - block_start;
+          if(gcbuf[i] == '\n') {
+            real_line++;
           }
+          if(len < 1) {
+            /* Skip empty lines */
+            continue;
+          }
+          gcblock *block = parse_block(gcbuf + block_start, len);
+          /* printf("Found line: \"%s\"\n", gcbuf + block_start); */
+          block_start = i + 1;
+
+          if(!block) {
+            fprintf(stderr, "WARNING: Skipping malformed block\n");
+            continue;
+          }
+
+          block->real_line = real_line;
+          block->index = blockidx++;
+
+          /* Append to block list */
+          if(head) {
+            tail->next = block;
+          } else {
+            head = block;
+          }
+          tail = block;
+
+          /* Update display list */
+          update(head);
         }
-        if(block_start < end) {
-          sofar = end - block_start;
-          if(block_start > 0) {
-            memmove(gcbuf, gcbuf + block_start, sofar);
-          }
+      }
+      if(block_start < end) {
+        sofar = end - block_start;
+        if(block_start > 0) {
+          memmove(gcbuf, gcbuf + block_start, sofar);
         }
       }
     }
   }
-  
-  /* TODO: Less delay if the above took a nontrivial amount of time */
-  if(!done) {
-    glutTimerFunc(FRAME_DELAY, readgcode, 0);
-  }
-}
+ }
 
 void resize(int width, int height) {
   GLfloat ratio;
@@ -290,6 +285,7 @@ int main(int argc, char** argv) {
   glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 
   /* Prepare for mainloop */
+  glutIdleFunc(readgcode);
   glutReshapeFunc(resize);
   glutKeyboardFunc(key);
   glutSpecialFunc(special_key);
@@ -303,7 +299,6 @@ int main(int argc, char** argv) {
   updatecam();
 
   /* Enter main loop */
-  readgcode(0);
   draw(0);
   glutMainLoop();
 
