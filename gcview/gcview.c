@@ -95,12 +95,16 @@ void update(gcblock *head) {
         case 0:                 /* Rapid Positioning */
           if(extruding) {
             glColor3f(1.0, 0.5, 0.0);
+          } else {
+            glColor3f(0.5, 0.5, 0.5);
           }
           break;
           
         case 1:                 /* Linear Interpolation */
           if(extruding) {
             glColor3f(0.0, 1.0, 0.25);
+          } else {
+            glColor3f(0.5, 0.5, 0.5);
           }
           break;
 
@@ -127,7 +131,6 @@ void update(gcblock *head) {
         case 102:
         case 103:
           extruding = 0;
-          glColor3f(0.5, 0.5, 0.5);
           break;
         }
         break;
