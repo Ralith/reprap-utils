@@ -93,7 +93,6 @@ void update(gcblock *head) {
       const gcword word = block->words[i];
       switch(word.letter) {
       case 'G':
-      case 'g':
         switch((unsigned)word.num) {
         case 0:                 /* Rapid Positioning */
           if(extruding) {
@@ -137,7 +136,6 @@ void update(gcblock *head) {
         break;
 
       case 'M':
-      case 'm':
         switch((unsigned)word.num) {
           /* Motor state */
         case 101:               /* On */
@@ -162,17 +160,14 @@ void update(gcblock *head) {
         break;
 
       case 'X':
-      case 'x':
         curr.x = (relative ? prev.x : 0) + word.num + offset.x;
         break;
 
       case 'Y':
-      case 'y':
         curr.y = (relative ? prev.y : 0) + word.num + offset.y;
         break;
 
       case 'Z':
-      case 'z':
         curr.z = (relative ? prev.z : 0) + word.num + offset.z;
         break;
 
