@@ -1,10 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <math.h>
-
 #include <stdio.h>
+
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/select.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #include <GL/gl.h>
 #include <GL/glut.h>
@@ -18,10 +23,9 @@
 
 #define MOTION_INCREMENT (M_PI/5)
 
-#define GCODE_BUFSIZE 512       /* Standard states 256 chars max */
-
 GLuint dlist;                   /* Display list pointer */
-FILE *gcsource;
+int gcsource;                   /* FD we're reading gcode from */
+fd_set fdset;
 
 struct {
   float latitude;
@@ -40,8 +44,55 @@ void draw(void) {
 }
 
 void idle(int ignored) {
+  static char gcbuf[GCODE_BLOCKSIZE];
+  static unsigned sofar = 0;    /* Number of bytes we've already read */
+  static gcblock *head = 0, *tail = 0;
+  static struct timeval timeout = {0, 0};
+
+  FD_SET(gcsource, &fdset);
+
+  int result;
+  result = select(gcsource + 1, &fdset, NULL, NULL, &timeout);
+  if(result < 0) {
+    /* Something went wrong */
+    perror("select");
+    exit(EXIT_FAILURE);
+  } else if(result > 0) {
+    /* We have data! */
+    if(FD_ISSET(gcsource, &fdset)) {
+      ssize_t bytes = read(gcsource, gcbuf + sofar, GCODE_BLOCKSIZE - sofar);
+      if(bytes < 0) {
+        perror("read");
+        exit(EXIT_FAILURE);
+      }
+      size_t i;
+      for(i = 0; i < bytes; ++i) {
+        if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
+          /* Parse new block */
+          gcblock *block = parse_block(gcbuf, sofar + i - 1);
+
+          /* Shuffle data around for a clean start for the next */
+          unsigned skip = (gcbuf[sofar + i + 1] == '\n') ? 2 : 1;
+          unsigned offset = sofar + i + skip;
+          memmove(gcbuf, gcbuf + offset, GCODE_BLOCKSIZE - offset);
+
+          /* Append block to block list */
+          if(head) {
+            tail->next = block;
+          } else {
+            head = block;
+            tail = block;
+          }
+
+          /* Rebuild display list */
+          update();
+        }
+      }
+    }
+  }
+
   draw();
-    
+  /* TODO: Less delay if the above took a nontrivial amount of time */
   glutTimerFunc(FRAME_DELAY, idle, 0);
 }
 
@@ -111,14 +162,28 @@ void update() {
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
 
-  /* Work out what we're reading from */
-  gcsource = stdin;             /* Default to stdin */
-  if(argc > 1) {
-    gcsource = fopen(argv[1], "r");
-    if(!gcsource) {
-      perror(argv[1]);
-      return 1;
+  {
+    /* Work out what we're reading from */
+    gcsource = STDIN_FILENO;
+    if(argc > 1) {
+      gcsource = open(argv[1], O_RDONLY);
+      if(gcsource < 0) {
+        perror(argv[1]);
+        exit(EXIT_FAILURE);
+      }
+
+      int flags;
+      if (-1 == (flags = fcntl(gcsource, F_GETFL, 0))) {
+        flags = 0;
+      }
+      if(-1 == fcntl(gcsource, F_SETFL, flags | O_NONBLOCK)) {
+        fprintf(stderr, "Failed to enter non-blocking mode: ");
+        perror("fcntl");
+        exit(EXIT_FAILURE);
+      }
     }
+    /* Init select data */
+    FD_ZERO(&fdset);
   }
     
   /* Create window */

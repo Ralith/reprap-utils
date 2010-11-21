@@ -10,7 +10,9 @@ if(GLUT_FOUND)
     target_link_libraries(gcview ${GLUT_LIBRARY})
     
     include_directories(${OPENGL_INCLUDE_DIR})
-    target_link_libraries(gcview ${OPENGL_LIBRARIES})  
+    target_link_libraries(gcview ${OPENGL_LIBRARIES})
+
+    target_link_libraries(gcview common)
 
     install(TARGETS gcview DESTINATION bin)
   else(OPENGL_FOUND)
