@@ -95,10 +95,14 @@ void readgcode() {
 
   int result;
   result = select(gcsource + 1, &fdset, NULL, NULL, &timeout);
+  printf("Select returned %d\n", result);
   if(result < 0) {
     /* Something went wrong */
     perror("select");
     exit(EXIT_FAILURE);
+  } else if(result == 0) {
+    /* Timeout expired; update display list */
+    update(head);
   } else if(result > 0) {
     /* We have data! */
     if(FD_ISSET(gcsource, &fdset)) {
@@ -109,6 +113,8 @@ void readgcode() {
       } else if(bytes == 0) {
         /* We got an EOF, no need to run any more */
         glutIdleFunc(NULL);
+        /* Ensure the display list is up to date before bailing out */
+        update(head);
         return;
       }
       size_t i = sofar;
@@ -131,7 +137,7 @@ void readgcode() {
           block_start = i + 1;
 
           if(!block) {
-            fprintf(stderr, "WARNING: Skipping malformed block\n");
+            fprintf(stderr, "WARNING: Line %d: Skipping malformed block\n", real_line);
             continue;
           }
 
@@ -145,9 +151,6 @@ void readgcode() {
             head = block;
           }
           tail = block;
-
-          /* Update display list */
-          update(head);
         }
       }
       if(block_start < end) {
@@ -158,7 +161,7 @@ void readgcode() {
       }
     }
   }
- }
+}
 
 void resize(int width, int height) {
   GLfloat ratio;
