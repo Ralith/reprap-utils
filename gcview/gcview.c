@@ -21,11 +21,13 @@
 
 #define FRAME_DELAY 17          /* 1/(17ms) = about 60FPS */
 
-#define MOTION_INCREMENT (M_PI/5)
+#define MOTION_INCREMENT (M_PI/8)
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
+
+GLfloat *camerarot;
 
 struct {
   float latitude;
@@ -33,11 +35,44 @@ struct {
   float radius;
 } camera;
 
+void makerot(GLfloat *matrix, float latitude, float longitude) {
+  float cosphi = cos(latitude);
+  float sinphi = sin(latitude);
+  float costheta = cos(longitude);
+  float sintheta = sin(longitude);
+
+  matrix[0] = costheta;
+  matrix[1] = 0;
+  matrix[2] = -sintheta;
+  matrix[3] = 0;
+
+  matrix[4] = sinphi * sintheta;
+  matrix[5] = costheta;
+  matrix[6] = sinphi * costheta;
+  matrix[7] = 0;
+
+  matrix[8] = cosphi * sintheta;
+  matrix[9] = -sinphi;
+  matrix[10] = cosphi * costheta;
+  matrix[11] = 0;
+
+  matrix[12] = 0;
+  matrix[13] = 0;
+  matrix[14] = 0;
+  matrix[15] = 0;
+}
+
+void updatecam() {
+  makerot(camerarot, camera.latitude, camera.longitude);
+}
 
 /* Draw the current state of affairs */
 void draw(void) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+  glLoadIdentity();
+  glLoadMatrixf(camerarot);
+  glTranslatef(0.0f, 0.0f, -camera.radius);
   glCallList(dlist);
 
   glutSwapBuffers();
@@ -88,7 +123,7 @@ void idle(int ignored) {
           }
 
           /* Rebuild display list */
-          update();
+          update(head);
 
           /* Leave loop */
           break;
@@ -96,7 +131,7 @@ void idle(int ignored) {
       }
     }
   }
-
+  
   draw();
   /* TODO: Less delay if the above took a nontrivial amount of time */
   glutTimerFunc(FRAME_DELAY, idle, 0);
@@ -122,18 +157,22 @@ void special_key(int key, int x, int y) {
   switch(key) {
   case GLUT_KEY_LEFT:
     camera.longitude -= MOTION_INCREMENT;
+    updatecam();
     break;
 
   case GLUT_KEY_RIGHT:
     camera.longitude += MOTION_INCREMENT;
+    updatecam();
     break;
 
   case GLUT_KEY_DOWN:
     camera.latitude -= MOTION_INCREMENT;
+    updatecam();
     break;
 
   case GLUT_KEY_UP:
     camera.latitude += MOTION_INCREMENT;
+    updatecam();
     break;
 
   default:
@@ -141,16 +180,16 @@ void special_key(int key, int x, int y) {
   }   
 }
 
-void update() {
+void update(gcblock *head) {
   if(glIsList(dlist)) {
     glDeleteLists(dlist, 1);
   }
   dlist = glGenLists(1);
   
   glNewList(dlist, GL_COMPILE);
-  /* Move Left 1.5 Units And Into The Screen 6.0 */
-  glLoadIdentity();
-  glTranslatef(-1.5f, 0.0f, -6.0f);
+  /* Move Left 1.5 Units */
+  /*glLoadIdentity();*/
+  glTranslatef(-1.5f, 0.0f, 0.0f);
 
   glBegin(GL_TRIANGLES);            /* Drawing Using Triangles */
   glVertex3f( 0.0f,  1.0f, 0.0f); /* Top */
@@ -232,9 +271,16 @@ int main(int argc, char** argv) {
   /* Prepare for mainloop */
   glutReshapeFunc(resize);
   glutSpecialFunc(special_key);
+  camerarot = calloc(16, sizeof(GLfloat));
+  makerot(camerarot, 0, 0);
+
+  /* Initialize state */
+  update(0);
+  camera.latitude = 0;
+  camera.longitude = 0;
+  camera.radius = 6;
 
   /* Enter main loop */
-  update();
   idle(0);
   glutMainLoop();
 
