@@ -205,11 +205,11 @@ void update(gcblock *head) {
 
 void readgcode(int ignored) {
   static char gcbuf[GCODE_BLOCKSIZE];
-  static unsigned sofar = 0;    /* Number of bytes we've already read */
   static gcblock *head = 0, *tail = 0;
   static struct timeval timeout = {0, 0};
   static char done = 0;
-  static unsigned blockidx = 1, real_line = 1;
+  static unsigned blockidx = 1, real_line = 0;
+  static unsigned sofar = 0;
 
   FD_SET(gcsource, &fdset);
 
@@ -222,7 +222,7 @@ void readgcode(int ignored) {
   } else if(result > 0) {
     /* We have data! */
     if(FD_ISSET(gcsource, &fdset)) {
-      ssize_t bytes = read(gcsource, gcbuf + sofar, GCODE_BLOCKSIZE - sofar);
+      ssize_t bytes = read(gcsource, gcbuf + sofar, GCODE_BLOCKSIZE - sofar - 1);
       if(bytes < 0) {
         perror("read");
         exit(EXIT_FAILURE);
@@ -230,52 +230,49 @@ void readgcode(int ignored) {
         /* We got an EOF. */
         done = 1;
       } else {
-        size_t i;
-        for(i = 0; i < (size_t)bytes; ++i) {
-          if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
-            /* Skip empty lines */
-            if(sofar + i + 1 < (size_t)bytes) {
-              switch(gcbuf[sofar + i + 1]) {
-              case '\n':
-                real_line++;
-              case '\r':
-                continue;
-                
-              default:
-                break;
-              }
-            } 
-                
-            /* Parse new block */
-            gcblock *block = parse_block(gcbuf, sofar + i + 1);
+        size_t i = sofar;
+        size_t block_start = 0;
+        const size_t end = sofar+bytes;
+        /* Parse any and all blocks */
+        for(; i < end; ++i) {
+          if(gcbuf[i] == '\n' || gcbuf[i] == '\r') {
+            /* gcbuf[i] = '\0'; */
+            const size_t len = i - block_start;
+            if(gcbuf[i] == '\n') {
+              real_line++;
+            }
+            if(len < 1) {
+              /* Skip empty lines */
+              continue;
+            }
+            gcblock *block = parse_block(gcbuf + block_start, len);
+            /* printf("Found line: \"%s\"\n", gcbuf + block_start); */
+            block_start = i + 1;
 
-            /* Shuffle data around for a clean start for the next */
-            unsigned skip = (gcbuf[sofar + i + 1] == '\n') ? 2 : 1;
-            memmove(gcbuf, gcbuf + sofar + i + skip, bytes - i);
-
-            if(block) {
-              /* Add final metadata */
-              block->index = blockidx++;
-              block->real_line = real_line++;
-              
-              /* Append block to block list */
-              if(head) {
-                tail->next = block;
-                tail = block;
-              } else {
-                head = block;
-                tail = block;
-              }
-            } else {
-              fprintf(stderr, "WARNING: Line %d: Got malformed block, ignoring.\n", real_line++);
+            if(!block) {
+              fprintf(stderr, "WARNING: Skipping malformed block\n");
+              continue;
             }
 
-            /* Rebuild display list */
-            update(head);
+            block->real_line = real_line;
+            block->index = blockidx++;
 
-            /* Reset loop */
-            bytes -= i;
-            i = 0;
+            /* Append to block list */
+            if(head) {
+              tail->next = block;
+            } else {
+              head = block;
+            }
+            tail = block;
+
+            /* Update display list */
+            update(head);
+          }
+        }
+        if(block_start < end) {
+          sofar = end - block_start;
+          if(block_start > 0) {
+            memmove(gcbuf, gcbuf + block_start, sofar);
           }
         }
       }

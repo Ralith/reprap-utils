@@ -1,4 +1,4 @@
-#define GCODE_BLOCKSIZE 256
+#define GCODE_BLOCKSIZE (256 + 1)
 
 typedef struct gcword {
   char letter;
