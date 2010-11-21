@@ -131,10 +131,9 @@ void readgcode() {
             continue;
           }
           char *text = calloc(len+1, sizeof(char));
-          text[len] = 0;
+          gcbuf[i] = 0;
           strncpy(text, gcbuf + block_start, len);
           gcblock *block = parse_block(gcbuf + block_start, len);
-          /* printf("Found line: \"%s\"\n", gcbuf + block_start); */
           block_start = i + 1;
 
           if(!block) {
