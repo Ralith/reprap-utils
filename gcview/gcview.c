@@ -95,7 +95,6 @@ void readgcode() {
 
   int result;
   result = select(gcsource + 1, &fdset, NULL, NULL, &timeout);
-  printf("Select returned %d\n", result);
   if(result < 0) {
     /* Something went wrong */
     perror("select");
