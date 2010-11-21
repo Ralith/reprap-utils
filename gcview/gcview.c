@@ -122,7 +122,6 @@ void readgcode() {
       /* Parse any and all blocks */
       for(; i < end; ++i) {
         if(gcbuf[i] == '\n' || gcbuf[i] == '\r') {
-          /* gcbuf[i] = '\0'; */
           const size_t len = i - block_start;
           if(gcbuf[i] == '\n') {
             real_line++;
@@ -131,15 +130,21 @@ void readgcode() {
             /* Skip empty lines */
             continue;
           }
+          char *text = calloc(len+1, sizeof(char));
+          text[len] = 0;
+          strncpy(text, gcbuf + block_start, len);
           gcblock *block = parse_block(gcbuf + block_start, len);
           /* printf("Found line: \"%s\"\n", gcbuf + block_start); */
           block_start = i + 1;
 
           if(!block) {
             fprintf(stderr, "WARNING: Line %d: Skipping malformed block\n", real_line);
+            fprintf(stderr, "Block: \"%s\"\n", text);
+            free(text);
             continue;
           }
 
+          block->text = text;
           block->real_line = real_line;
           block->index = blockidx++;
 

@@ -14,6 +14,7 @@ typedef struct gcword {
 
 typedef struct gcblock {
   struct gcblock *next;
+  char *text;
   char optdelete;
   unsigned line, real_line, index;
   gcword *words;
