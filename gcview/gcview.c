@@ -59,7 +59,7 @@ void updatecam() {
 }
 
 /* Draw the current state of affairs */
-void draw(void) {
+void draw(int ignored) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
   
@@ -68,6 +68,9 @@ void draw(void) {
   glCallList(dlist);
 
   glutSwapBuffers();
+
+  /* TODO: Adjust timing for draw delay */
+  glutTimerFunc(FRAME_DELAY, draw, 0);
 }
 
 void update(gcblock *head) {
@@ -168,11 +171,12 @@ void update(gcblock *head) {
   glEndList();
 }
 
-void idle(int ignored) {
+void readgcode(int ignored) {
   static char gcbuf[GCODE_BLOCKSIZE];
   static unsigned sofar = 0;    /* Number of bytes we've already read */
   static gcblock *head = 0, *tail = 0;
   static struct timeval timeout = {0, 0};
+  static char done = 0;
 
   FD_SET(gcsource, &fdset);
 
@@ -189,43 +193,48 @@ void idle(int ignored) {
       if(bytes < 0) {
         perror("read");
         exit(EXIT_FAILURE);
-      }
-      size_t i;
-      for(i = 0; i < (size_t)bytes; ++i) {
-        if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
-          /* Parse new block */
-          gcblock *block = parse_block(gcbuf, sofar + i + 1);
+      } else if(bytes == 0) {
+        /* We got an EOF. */
+        done = 1;
+      } else {
+        size_t i;
+        for(i = 0; i < (size_t)bytes; ++i) {
+          if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
+            /* Parse new block */
+            gcblock *block = parse_block(gcbuf, sofar + i + 1);
 
-          /* Shuffle data around for a clean start for the next */
-          unsigned skip = (gcbuf[sofar + i + 1] == '\n') ? 2 : 1;
-          memmove(gcbuf, gcbuf + sofar + i + skip, bytes - i);
+            /* Shuffle data around for a clean start for the next */
+            unsigned skip = (gcbuf[sofar + i + 1] == '\n') ? 2 : 1;
+            memmove(gcbuf, gcbuf + sofar + i + skip, bytes - i);
 
-          if(block) {
-            /* Append block to block list */
-            if(head) {
-              tail->next = block;
-              tail = block;
+            if(block) {
+              /* Append block to block list */
+              if(head) {
+                tail->next = block;
+                tail = block;
+              } else {
+                head = block;
+                tail = block;
+              }
             } else {
-              head = block;
-              tail = block;
+              fprintf(stderr, "WARNING: Got malformed block, ignoring.\n");
             }
-          } else {
-            fprintf(stderr, "WARNING: Got malformed block, ignoring.\n");
+
+            /* Rebuild display list */
+            update(head);
+
+            /* Leave loop */
+            break;
           }
-
-          /* Rebuild display list */
-          update(head);
-
-          /* Leave loop */
-          break;
         }
       }
     }
   }
   
-  draw();
   /* TODO: Less delay if the above took a nontrivial amount of time */
-  glutTimerFunc(FRAME_DELAY, idle, 0);
+  if(!done) {
+    glutTimerFunc(FRAME_DELAY, readgcode, 0);
+  }
 }
 
 void resize(int width, int height) {
@@ -366,7 +375,8 @@ int main(int argc, char** argv) {
   updatecam();
 
   /* Enter main loop */
-  idle(0);
+  readgcode(0);
+  draw(0);
   glutMainLoop();
 
 	exit(EXIT_SUCCESS);
