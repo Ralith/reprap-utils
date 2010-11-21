@@ -69,23 +69,29 @@ void idle(int ignored) {
       for(i = 0; i < bytes; ++i) {
         if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
           /* Parse new block */
-          gcblock *block = parse_block(gcbuf, sofar + i - 1);
+          gcblock *block = parse_block(gcbuf, sofar + i + 1);
 
           /* Shuffle data around for a clean start for the next */
           unsigned skip = (gcbuf[sofar + i + 1] == '\n') ? 2 : 1;
-          unsigned offset = sofar + i + skip;
-          memmove(gcbuf, gcbuf + offset, GCODE_BLOCKSIZE - offset);
+          memmove(gcbuf, gcbuf + sofar + i + skip, bytes - i);
 
-          /* Append block to block list */
-          if(head) {
-            tail->next = block;
+          if(block) {
+            /* Append block to block list */
+            if(head) {
+              tail->next = block;
+            } else {
+              head = block;
+              tail = block;
+            }
           } else {
-            head = block;
-            tail = block;
+            fprintf(stderr, "WARNING: Got malformed block, ignoring.\n");
           }
 
           /* Rebuild display list */
           update();
+
+          /* Leave loop */
+          break;
         }
       }
     }
@@ -136,6 +142,11 @@ void special_key(int key, int x, int y) {
 }
 
 void update() {
+  if(glIsList(dlist)) {
+    glDeleteLists(dlist, 1);
+  }
+  dlist = glGenLists(1);
+  
   glNewList(dlist, GL_COMPILE);
   /* Move Left 1.5 Units And Into The Screen 6.0 */
   glLoadIdentity();
@@ -218,15 +229,12 @@ int main(int argc, char** argv) {
   glDepthFunc( GL_LEQUAL );
   glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 
-  /* Allocate display list */
-  dlist = glGenLists(1);
-  update();
-
   /* Prepare for mainloop */
   glutReshapeFunc(resize);
   glutSpecialFunc(special_key);
 
   /* Enter main loop */
+  update();
   idle(0);
   glutMainLoop();
 

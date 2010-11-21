@@ -36,7 +36,7 @@ gcblock *parse_block(char *buffer, unsigned len) {
   /* Check for optional delete */
   if(buffer[i] == '/') {
     block->optdelete = 1;
-    i = next_dark(buffer, len, i);
+    i = next_dark(buffer, len, i + 1);
   }
 
   /* Check for line number */
@@ -44,18 +44,19 @@ gcblock *parse_block(char *buffer, unsigned len) {
     i = next_dark(buffer, len, len);
     char* endptr;
     block->line = strtol(buffer + i, &endptr, 10);
-    i = next_dark(buffer, len, (buffer - endptr));
+    i = next_dark(buffer, len, endptr - buffer);
   }
 
   /* Parse words */
   unsigned allocsize = 0;
-  for(; i < len; i = next_dark(buffer, len, i)) {
+  while(i < len) {
     if(block->wordcnt == allocsize) {
-      block->words = realloc(block->words, 2*(allocsize ? allocsize : 4));
+      allocsize = 2*(allocsize ? allocsize : 2);
+      block->words = realloc(block->words, allocsize * sizeof(gcword));
     }
     
     block->words[block->wordcnt].letter = buffer[i];
-    i = next_dark(buffer, len, i);
+    i = next_dark(buffer, len, i + 1);
     if(i == len) {
       free(block->words);
       free(block);
@@ -65,21 +66,29 @@ gcblock *parse_block(char *buffer, unsigned len) {
     /* TODO: Spaces in numbers */
     /* TODO: Gn.m support */
     {
-      float fnum;
-      int inum;
       char *endptr;
-      inum = strtol(buffer + i, &endptr, 10);
-      
-      if(*endptr == '.') {
-        fnum = strtof(buffer + i, &endptr);
-        block->words[block->wordcnt].fnum = fnum;
-      } else {
-        block->words[block->wordcnt].inum = inum;
+      switch(block->words[block->wordcnt].letter) {
+      case 'g':
+      case 'G':
+      case 'm':
+      case 'M':
+        block->words[block->wordcnt].inum = strtol(buffer + i, &endptr, 10);
+        break;
+
+      default:
+        block->words[block->wordcnt].fnum = strtof(buffer + i, &endptr);
+        break;
       }
-      
-      i = next_dark(buffer, len, (buffer - endptr));
-      ++(block->wordcnt);
+
+      if(endptr == buffer + i) {
+        free(block->words);
+        free(block);
+        return NULL;
+      }
+
+      i = next_dark(buffer, len, endptr - buffer);
     }
+    ++(block->wordcnt);
   }
 
   return block;
