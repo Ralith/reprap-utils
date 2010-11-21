@@ -45,8 +45,9 @@ void storexform(GLfloat *matrix, float latitude, float longitude, float radius) 
     glLoadIdentity();
     
     glTranslatef(0.0f, 0.0f, -camera.radius);
-    glRotatef(-camera.latitude, 1, 0, 0);
+    glRotatef(camera.latitude, 1, 0, 0);
     glRotatef(-camera.longitude, 0, 1, 0);
+    //glTranslatef(1.0f, 1.0f, 0.0f);
 
     glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
   }
@@ -191,12 +192,12 @@ void key(unsigned char key, int x, int y) {
   switch(key) {
   case '+':
   case '=':
-    camera.radius += 1;
+    camera.radius -= 10;
     updatecam();
     break;
 
   case '-':
-    camera.radius -= 1;
+    camera.radius += 10;
     updatecam();
     break;
   }
@@ -306,7 +307,7 @@ int main(int argc, char** argv) {
   update(0);
   camera.latitude = 0;
   camera.longitude = 0;
-  camera.radius = 6;
+  camera.radius = 100;
   updatecam();
 
   /* Enter main loop */
