@@ -130,13 +130,23 @@ void update(gcblock *head) {
       case 'M':
       case 'm':
         switch((unsigned)word.num) {
-        case 101:
+          /* Motor state */
+        case 101:               /* On */
           extruding = 1;
           break;
-
-        case 102:
-        case 103:
+        case 102:               /* Off */
+        case 103:               /* Reverse */
           extruding = 0;
+          break;
+
+          /* Ignored */
+        case 6:                 /* Wait for warmup */
+        case 108:               /* Set speed */
+        case 1:                 /* Interactive extruder test */
+          break;
+
+        default:
+          fprintf(stderr, "WARNING: Line %d: Skipping unrecognized M code M%d\n", block->real_line, (unsigned)word.num);
           break;
         }
         break;
@@ -157,8 +167,11 @@ void update(gcblock *head) {
         break;
 
         /* Ignored words */
-      case 'F':
-      case 'P':
+      case 'F':                 /* Feedrate */
+      case 'P':                 /* Param to Dwell, others? */
+      case 'S':                 /* Speed (TODO: consider coloring) */
+      case 'R':                 /* Param to M108 meaning what? */
+      case 'T':                 /* Param to M6 (wait for warmup), others? */
         break;
 
       default:
