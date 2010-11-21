@@ -1,5 +1,9 @@
 #define GCODE_BLOCKSIZE (256 + 1)
 
+typedef struct {
+  float x, y, z;
+} point;
+
 typedef struct gcword {
   char letter;
   float num;

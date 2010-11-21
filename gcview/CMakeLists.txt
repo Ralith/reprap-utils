@@ -4,6 +4,7 @@ if(GLUT_FOUND)
   find_package(OpenGL)
   if(OPENGL_FOUND)
     add_executable(gcview
+      render.c
       gcview.c)
 
     include_directories(${GLUT_INCLUDE_DIR})
