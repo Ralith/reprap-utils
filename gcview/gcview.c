@@ -12,7 +12,8 @@
 #include <fcntl.h>
 
 #include <GL/gl.h>
-#include <GL/glut.h>
+#include <GL/glu.h>
+#include <SDL.h>
 
 #include "../common/gcode.h"
 #include "render.h"
@@ -44,9 +45,9 @@ void storexform(GLfloat *matrix, float latitude, float longitude, float radius) 
   {
     glLoadIdentity();
     
-    glTranslatef(0.0f, 0.0f, -camera.radius);
-    glRotatef(-camera.longitude, 0, 1, 0);
-    glRotatef(camera.latitude, 1, 0, 0);
+    glTranslatef(0.0f, 0.0f, -radius);
+    glRotatef(-longitude, 0, 1, 0);
+    glRotatef(latitude, 1, 0, 0);
     //glTranslatef(1.0f, 1.0f, 0.0f);
 
     glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
@@ -59,7 +60,7 @@ void updatecam() {
 }
 
 /* Draw the current state of affairs */
-void draw(int ignored) {
+void draw() {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glLoadIdentity();
   
@@ -67,10 +68,7 @@ void draw(int ignored) {
   
   glCallList(dlist);
 
-  glutSwapBuffers();
-
-  /* TODO: Adjust timing for draw delay */
-  glutTimerFunc(FRAME_DELAY, draw, 0);
+  SDL_GL_SwapBuffers();
 }
 
 void update(gcblock *head) {
@@ -87,12 +85,12 @@ void update(gcblock *head) {
   glEndList();
 }
 
-void readgcode() {
+int readgcode(struct timeval timeout) {
   static char gcbuf[GCODE_BLOCKSIZE];
   static gcblock *head = 0, *tail = 0;
-  static struct timeval timeout = {0, (FRAME_DELAY*1000)};
   static unsigned blockidx = 1, real_line = 0;
   static unsigned sofar = 0;
+  static char needsupdate = 0;
 
   FD_SET(gcsource, &fdset);
 
@@ -103,8 +101,11 @@ void readgcode() {
     perror("select");
     exit(EXIT_FAILURE);
   } else if(result == 0) {
-    /* Timeout expired; update display list */
-    update(head);
+    if(needsupdate) {
+      /* Timeout expired; update display list */
+      update(head);
+      needsupdate = 0;
+    }
   } else if(result > 0) {
     /* We have data! */
     if(FD_ISSET(gcsource, &fdset)) {
@@ -113,11 +114,12 @@ void readgcode() {
         perror("read");
         exit(EXIT_FAILURE);
       } else if(bytes == 0) {
-        /* We got an EOF, no need to run any more */
-        glutIdleFunc(NULL);
+        /* We got an EOF */
         /* Ensure the display list is up to date before bailing out */
-        update(head);
-        return;
+        if(needsupdate) {
+          update(head);
+        }
+        return 0;
       }
       size_t i = sofar;
       size_t block_start = 0;
@@ -157,6 +159,7 @@ void readgcode() {
             head = block;
           }
           tail = block;
+          needsupdate = 1;
         }
       }
       if(block_start < end) {
@@ -170,6 +173,7 @@ void readgcode() {
       }
     }
   }
+  return 1;
 }
 
 void resize(int width, int height) {
@@ -188,46 +192,42 @@ void resize(int width, int height) {
   glLoadIdentity();
 }
 
-void key(unsigned char key, int x, int y) {
-  switch(key) {
-  case '+':
-  case '=':
+void handlekey(SDL_keysym *key) {
+  switch(key->sym) {
+  case SDLK_PLUS:
+  case SDLK_EQUALS:
     camera.radius -= 10;
     updatecam();
     break;
 
-  case '-':
+  case SDLK_MINUS:
     camera.radius += 10;
     updatecam();
     break;
-  }
-}
 
-void special_key(int key, int x, int y) {
-  switch(key) {
-  case GLUT_KEY_LEFT:
+  case SDLK_LEFT:
     camera.longitude -= MOTION_INCREMENT;
     updatecam();
     break;
 
-  case GLUT_KEY_RIGHT:
+  case SDLK_RIGHT:
     camera.longitude += MOTION_INCREMENT;
     updatecam();
     break;
 
-  case GLUT_KEY_DOWN:
+  case SDLK_DOWN:
     camera.latitude -= MOTION_INCREMENT;
     updatecam();
     break;
 
-  case GLUT_KEY_UP:
+  case SDLK_UP:
     camera.latitude += MOTION_INCREMENT;
     updatecam();
     break;
 
   default:
     break;
-  }   
+  }
 }
 
 void cleanup(void) {
@@ -237,8 +237,6 @@ void cleanup(void) {
 }
 
 int main(int argc, char** argv) {
-  glutInit(&argc, argv);
-
   {
     /* Work out what we're reading from */
     gcsource = STDIN_FILENO;
@@ -263,11 +261,40 @@ int main(int argc, char** argv) {
     /* Init select data */
     FD_ZERO(&fdset);
   }
+
+  /* Init SDL */
+  if(SDL_Init(SDL_INIT_VIDEO) < 0) {
+    fprintf(stderr, "Video initialization failed: %s\n", SDL_GetError());
+    exit(EXIT_FAILURE);
+  }
+  atexit(SDL_Quit);
+  SDL_EnableKeyRepeat(1, SDL_DEFAULT_REPEAT_INTERVAL);
     
   /* Create window */
+  int vflags;
+  SDL_Surface *surface;
   {
-    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_MULTISAMPLE);
-    glutInitWindowSize(DEFAULT_W, DEFAULT_H);
+    const SDL_VideoInfo *vinfo;
+    vinfo = SDL_GetVideoInfo();
+    if(!vinfo) {
+      fprintf(stderr, "Video query failed: %s\n", SDL_GetError());
+      exit(EXIT_FAILURE);
+    }
+
+    vflags = SDL_OPENGL
+      | SDL_GL_DOUBLEBUFFER
+      | SDL_HWPALETTE
+      | SDL_RESIZABLE
+      | (vinfo->hw_available ? SDL_HWSURFACE : SDL_SWSURFACE)
+      | (vinfo->blit_hw ? SDL_HWACCEL : 0);
+
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+    surface = SDL_SetVideoMode(DEFAULT_W, DEFAULT_H, 16, vflags);
+    if(!surface) {
+      fprintf(stderr, "Failed to set video mode: %s\n", SDL_GetError());
+      exit(EXIT_FAILURE);
+    }
 
     /* Build title string */
     size_t titlelen = strlen(argv[0]);
@@ -278,13 +305,12 @@ int main(int argc, char** argv) {
     }
     char *title = malloc(titlelen);
     *title = '\0';
-    strcat(title, argv[0]);
+    strcat(title, "gcview");
     for(i = 1; i < argc; ++i) {
       strcat(title, " ");
       strcat(title, argv[i]);
     }
-        
-    glutCreateWindow(title);
+    SDL_WM_SetCaption(title, title);
     free(title);
   }
 
@@ -297,10 +323,6 @@ int main(int argc, char** argv) {
   glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 
   /* Prepare for mainloop */
-  glutIdleFunc(readgcode);
-  glutReshapeFunc(resize);
-  glutKeyboardFunc(key);
-  glutSpecialFunc(special_key);
   camtransform = calloc(16, sizeof(GLfloat));
 
   /* Initialize state */
@@ -311,8 +333,43 @@ int main(int argc, char** argv) {
   updatecam();
 
   /* Enter main loop */
-  draw(0);
-  glutMainLoop();
+  SDL_Event e;
+  char done = 0;
+  char gcdone = 0;
+  struct timeval t0, t, dt;
+  while(!done) {
+    dt.tv_sec = 0;
+    dt.tv_usec = 0;
+    gettimeofday(&t0, NULL);
+    while(SDL_PollEvent(&e)) {
+      switch(e.type) {
+      case SDL_VIDEORESIZE:
+        surface = SDL_SetVideoMode(e.resize.w, e.resize.h, 16, vflags);
+        if(!surface) {
+          fprintf(stderr, "Failed to set video mode: %s\n", SDL_GetError());
+          exit(EXIT_FAILURE);
+        }
+        resize(e.resize.w, e.resize.h);
+        break;
+
+      case SDL_KEYDOWN:
+        handlekey(&e.key.keysym);
+        break;
+
+      case SDL_QUIT:
+        done = 1;
+        break;
+      }
+    }
+    while(!gcdone && dt.tv_sec == 0 && dt.tv_usec <= (1000 * FRAME_DELAY)) {
+      struct timeval timeout = {0, (1000 * FRAME_DELAY) - dt.tv_usec};
+      gcdone = !readgcode(timeout);
+      gettimeofday(&t, NULL);
+      dt.tv_sec = t.tv_sec - t0.tv_sec;
+      dt.tv_usec = t.tv_usec - t0.tv_usec;
+    }
+    draw();
+  }
 
 	exit(EXIT_SUCCESS);
 }
