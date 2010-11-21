@@ -4,8 +4,6 @@
 #include <string.h>
 #include <math.h>
 
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <stdio.h>
 
 #include <GL/gl.h>
@@ -20,16 +18,16 @@
 
 #define MOTION_INCREMENT (M_PI/5)
 
-char redraw;                    /* Is the view up to date? */
+#define GCODE_BUFSIZE 512       /* Standard states 256 chars max */
+
 GLuint dlist;                   /* Display list pointer */
-int fd;                         /* Where we're getting our gcode */
+FILE *gcsource;
 
 struct {
   float latitude;
   float longitude;
   float radius;
 } camera;
-
 
 
 /* Draw the current state of affairs */
@@ -39,14 +37,10 @@ void draw(void) {
   glCallList(dlist);
 
   glutSwapBuffers();
-
-  redraw = 0;               /* Image is now up to date */
 }
 
 void idle(int ignored) {
-  if(redraw) {
-    draw();
-  }
+  draw();
     
   glutTimerFunc(FRAME_DELAY, idle, 0);
 }
@@ -65,30 +59,24 @@ void resize(int width, int height) {
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
-  
-  redraw = 1;
 }
 
 void special_key(int key, int x, int y) {
   switch(key) {
   case GLUT_KEY_LEFT:
     camera.longitude -= MOTION_INCREMENT;
-    redraw = 1;
     break;
 
   case GLUT_KEY_RIGHT:
     camera.longitude += MOTION_INCREMENT;
-    redraw = 1;
     break;
 
   case GLUT_KEY_DOWN:
     camera.latitude -= MOTION_INCREMENT;
-    redraw = 1;
     break;
 
   case GLUT_KEY_UP:
     camera.latitude += MOTION_INCREMENT;
-    redraw = 1;
     break;
 
   default:
@@ -96,7 +84,7 @@ void special_key(int key, int x, int y) {
   }   
 }
 
-GLuint update() {
+void update() {
   glNewList(dlist, GL_COMPILE);
   /* Move Left 1.5 Units And Into The Screen 6.0 */
   glLoadIdentity();
@@ -124,14 +112,13 @@ int main(int argc, char** argv) {
   glutInit(&argc, argv);
 
   /* Work out what we're reading from */
+  gcsource = stdin;             /* Default to stdin */
   if(argc > 1) {
-    fd = open(argv[1], O_RDONLY);
-    if(fd < 0) {
+    gcsource = fopen(argv[1], "r");
+    if(!gcsource) {
       perror(argv[1]);
       return 1;
     }
-  } else {
-    fd = stdin;
   }
     
   /* Create window */
@@ -173,7 +160,6 @@ int main(int argc, char** argv) {
   /* Prepare for mainloop */
   glutReshapeFunc(resize);
   glutSpecialFunc(special_key);
-  redraw = 0;
 
   /* Enter main loop */
   idle(0);
