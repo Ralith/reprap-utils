@@ -4,8 +4,14 @@
 #include <string.h>
 #include <math.h>
 
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+
 #include <GL/gl.h>
 #include <GL/glut.h>
+
+#include "../common/gcode.h"
 
 #define DEFAULT_W 640
 #define DEFAULT_H 480
@@ -15,12 +21,16 @@
 #define MOTION_INCREMENT (M_PI/5)
 
 char redraw;                    /* Is the view up to date? */
+GLuint dlist;                   /* Display list pointer */
+int fd;                         /* Where we're getting our gcode */
 
 struct {
   float latitude;
   float longitude;
   float radius;
 } camera;
+
+
 
 /* Draw the current state of affairs */
 void draw(void) {
@@ -104,10 +114,24 @@ void special_key(int key, int x, int y) {
   }   
 }
 
+GLuint updateList() {
+  glNewList(dlist, GL_COMPILE);
+  
+}
+
 int main(int argc, char** argv) {
   glutInit(&argc, argv);
 
-  /* TODO: Validate arguments */
+  /* Work out what we're reading from */
+  if(argc > 1) {
+    fd = open(argv[1], O_RDONLY);
+    if(fd < 0) {
+      perror(argv[1]);
+      return 1;
+    }
+  } else {
+    fd = stdin;
+  }
     
   /* Create window */
   {
@@ -140,6 +164,9 @@ int main(int argc, char** argv) {
   glEnable( GL_DEPTH_TEST );
   glDepthFunc( GL_LEQUAL );
   glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+
+  /* Allocate display list */
+  dlist = glGenLists(1);
 
   /* Prepare for mainloop */
   glutReshapeFunc(resize);
