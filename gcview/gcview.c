@@ -23,6 +23,10 @@
 
 #define MOTION_INCREMENT M_PI
 
+typedef struct {
+  float x, y, z;
+} point;
+
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
@@ -64,6 +68,101 @@ void draw(void) {
   glCallList(dlist);
 
   glutSwapBuffers();
+}
+
+void update(gcblock *head) {
+  char relative = 0;
+  char extruding = 0;
+  point prev = {0.0, 0.0, 0.0}, curr = {0.0, 0.0, 0.0}, offset = {0.0, 0.0, 0.0};
+  
+  if(glIsList(dlist)) {
+    glDeleteLists(dlist, 1);
+  }
+  dlist = glGenLists(1);
+  glNewList(dlist, GL_COMPILE);
+
+  /* Evaluate blocks sequentially */
+  gcblock *block;
+  for(block = head; block != NULL; block = block->next) {
+    /* Evaluate all words in the block */
+    size_t i;
+    for(i = 0; i < block->wordcnt; ++i) {
+      const gcword word = block->words[i];
+      switch(word.letter) {
+      case 'G':
+      case 'g':
+        switch(word.inum) {
+        case 0:                 /* Rapid Positioning */
+          if(extruding) {
+            glColor3f(1.0, 0.5, 0.0);
+          }
+          break;
+          
+        case 1:                 /* Linear Interpolation */
+          if(extruding) {
+            glColor3f(0.0, 1.0, 0.25);
+          }
+          break;
+
+        case 2:                 /* CW arc */
+        case 3:                 /* CC arc */
+        case 4:                 /* Dwell */
+        case 92:                /* Set offset */
+          fprintf(stderr, "UNIMPLEMENTED\n");
+          break;
+
+        default:
+          fprintf(stderr, "WARNING: Skipping unrecognized word G%d\n", word.inum);
+          break;
+        }
+        break;
+
+      case 'M':
+      case 'm':
+        switch(word.inum) {
+        case 101:
+          extruding = 1;
+          break;
+
+        case 102:
+        case 103:
+          extruding = 0;
+          glColor3f(0.5, 0.5, 0.5);
+          break;
+        }
+        break;
+
+      case 'X':
+      case 'x':
+        curr.x = (relative ? prev.x : 0) + word.fnum + offset.x;
+        break;
+
+      case 'Y':
+      case 'y':
+        curr.y = (relative ? prev.y : 0) + word.fnum + offset.y;
+        break;
+
+      case 'Z':
+      case 'z':
+        curr.z = (relative ? prev.z : 0) + word.fnum + offset.z;
+        break;
+        
+      default:
+        break;
+      }
+    }
+    if(curr.x != prev.x || curr.y != prev.y || curr.z != prev.z) {
+      glBegin(GL_LINES);
+      {
+        glVertex3f(prev.x, prev.y, prev.z);
+        glVertex3f(curr.x, curr.y, curr.z);
+      }
+      glEnd();
+      prev = curr;
+    }
+  }
+
+  glEndList();
 }
 
 void idle(int ignored) {
@@ -182,68 +281,6 @@ void special_key(int key, int x, int y) {
   default:
     break;
   }   
-}
-
-void update(gcblock *head) {
-  struct {
-    float x, y, z;
-  } prev = {0.0, 0.0, 0.0}, curr = {0.0, 0.0, 0.0};
-  char relative = 0;
-  
-  if(glIsList(dlist)) {
-    glDeleteLists(dlist, 1);
-  }
-  dlist = glGenLists(1);
-  glNewList(dlist, GL_COMPILE);
-
-  /* Evaluate blocks sequentially */
-  gcblock *block;
-  for(block = head; block != NULL; block = block->next) {
-    /* Evaluate all words in the block */
-    size_t i;
-    for(i = 0; i < block->wordcnt; ++i) {
-      const gcword word = block->words[i];
-      switch(word.letter) {
-      case 'G':
-      case 'g':
-        switch(word.inum) {
-        case 0:
-          glColor3f(1.0, 0.5, 0.0);
-          break;
-        case 1:
-          glColor3f(0.0, 1.0, 0.25);
-        }
-        break;
-
-      case 'X':
-      case 'x':
-        curr.x = (relative ? prev.x : 0) + word.fnum;
-        break;
-
-      case 'Y':
-      case 'y':
-        curr.y = (relative ? prev.y : 0) + word.fnum;
-        break;
-
-      case 'Z':
-      case 'z':
-        curr.z = (relative ? prev.z : 0) + word.fnum;
-        break;
-        
-      default:
-        break;
-      }
-    }
-    glBegin(GL_LINES);
-    {
-      glVertex3f(prev.x, prev.y, prev.z);
-      glVertex3f(curr.x, curr.y, curr.z);
-    }
-    glEnd();
-    prev = curr;
-  }
-
-  glEndList();
 }
 
 void cleanup(void) {

@@ -1,9 +1,5 @@
 #define GCODE_BLOCKSIZE 256
 
-typedef struct point {
-  float x, y, z;
-} point;
-
 typedef struct gcword {
   char letter;
   union {
