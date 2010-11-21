@@ -24,6 +24,8 @@
 
 #define MOTION_INCREMENT M_PI
 
+#define VIEWDISTANCE (1000.0f)
+
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
@@ -179,7 +181,7 @@ void resize(int width, int height) {
 
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  gluPerspective(45.0f, ratio, 0.1f, 100.0f);
+  gluPerspective(45.0f, ratio, 0.1f, VIEWDISTANCE);
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
