@@ -79,7 +79,6 @@ int isnum(char *str)
 	size_t i;
   size_t len = strlen(str);
 	int points = 0;
-  /* TODO: Better checks. */
   i = ((str[0] == '-' && len > 1) ? 1 : 0);
 	for(; i < strlen(str); i++) {
 		if((str[i] > '9' || str[i] < '0')) {
