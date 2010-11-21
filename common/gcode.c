@@ -50,6 +50,15 @@ gcblock *parse_block(char *buffer, unsigned len) {
   /* Parse words */
   unsigned allocsize = 0;
   while(i < len) {
+    /* Skip comments */
+    while(buffer[i] == '(') {
+      for(; i < len && buffer[i] != ')'; ++i);
+      i = next_dark(buffer, len, i + 1);
+      if(i >= len) {
+        return block;
+      }
+    }
+      
     if(block->wordcnt == allocsize) {
       allocsize = 2*(allocsize ? allocsize : 2);
       block->words = realloc(block->words, allocsize * sizeof(gcword));
