@@ -223,8 +223,9 @@ void readgcode(int ignored) {
             /* Rebuild display list */
             update(head);
 
-            /* Leave loop */
-            break;
+            /* Reset loop */
+            bytes -= i;
+            i = 0;
           }
         }
       }
