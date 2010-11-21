@@ -31,7 +31,7 @@ gcblock *parse_block(char *buffer, unsigned len) {
   block->line = 0;
   block->optdelete = 0;
   block->words = NULL;
-  block->wordslen = 0;
+  block->wordcnt = 0;
 
   /* Check for optional delete */
   if(buffer[i] == '/') {
@@ -48,13 +48,13 @@ gcblock *parse_block(char *buffer, unsigned len) {
   }
 
   /* Parse words */
-  unsigned wordsparsed = 0;
+  unsigned allocsize = 0;
   for(; i < len; i = next_dark(buffer, len, i)) {
-    if(block->wordslen == wordsparsed) {
-      block->words = realloc(block->words, 2*(wordsparsed ? wordsparsed : 4));
+    if(block->wordcnt == allocsize) {
+      block->words = realloc(block->words, 2*(allocsize ? allocsize : 4));
     }
     
-    block->words[wordsparsed].letter = buffer[i];
+    block->words[block->wordcnt].letter = buffer[i];
     i = next_dark(buffer, len, i);
     if(i == len) {
       free(block->words);
@@ -72,14 +72,15 @@ gcblock *parse_block(char *buffer, unsigned len) {
       
       if(*endptr == '.') {
         fnum = strtof(buffer + i, &endptr);
-        block->words[wordsparsed].fnum = fnum;
+        block->words[block->wordcnt].fnum = fnum;
       } else {
-        block->words[wordsparsed].inum = inum;
+        block->words[block->wordcnt].inum = inum;
       }
       
       i = next_dark(buffer, len, (buffer - endptr));
+      ++(block->wordcnt);
     }
   }
-  
+
   return block;
 }
