@@ -161,7 +161,10 @@ void readgcode() {
         sofar = end - block_start;
         if(block_start > 0) {
           memmove(gcbuf, gcbuf + block_start, sofar);
+          gcbuf[sofar] = 0;
         }
+      } else {
+        sofar = 0;
       }
     }
   }
