@@ -111,6 +111,13 @@ void update(gcblock *head) {
           }
           break;
 
+        case 90:                /* Absolute positioning */
+          relative = 0;
+          break;
+        case 91:                /* Relative positioning */
+          relative = 1;
+          break;
+
         case 2:                 /* CW arc */
         case 3:                 /* CC arc */
         case 92:                /* Set offset */
@@ -119,6 +126,8 @@ void update(gcblock *head) {
 
           /* Ignored */
         case 4:                 /* Dwell */
+        case 20:                /* Inches (TODO: Scale) */
+        case 21:                /* mm */
           break;
 
         default:
@@ -140,9 +149,10 @@ void update(gcblock *head) {
           break;
 
           /* Ignored */
-        case 6:                 /* Wait for warmup */
-        case 108:               /* Set speed */
         case 1:                 /* Interactive extruder test */
+        case 6:                 /* Wait for warmup */
+        case 104:               /* Set temp (TODO: color?) */
+        case 108:               /* Set speed */
           break;
 
         default:
