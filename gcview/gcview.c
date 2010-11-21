@@ -45,8 +45,8 @@ void storexform(GLfloat *matrix, float latitude, float longitude, float radius) 
     glLoadIdentity();
     
     glTranslatef(0.0f, 0.0f, -camera.radius);
-    glRotatef(camera.latitude, 1, 0, 0);
     glRotatef(-camera.longitude, 0, 1, 0);
+    glRotatef(camera.latitude, 1, 0, 0);
     //glTranslatef(1.0f, 1.0f, 0.0f);
 
     glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
