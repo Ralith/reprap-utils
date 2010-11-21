@@ -120,7 +120,6 @@ void update(gcblock *head) {
 
         case 2:                 /* CW arc */
         case 3:                 /* CC arc */
-        case 92:                /* Set offset */
           fprintf(stderr, "UNIMPLEMENTED: Line %d: G%d\n", block->real_line, (unsigned)word.num);
           break;
 
@@ -128,6 +127,7 @@ void update(gcblock *head) {
         case 4:                 /* Dwell */
         case 20:                /* Inches (TODO: Scale) */
         case 21:                /* mm */
+        case 92:                /* Set offset */
           break;
 
         default:
