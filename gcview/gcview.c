@@ -113,13 +113,16 @@ void update(gcblock *head) {
 
         case 2:                 /* CW arc */
         case 3:                 /* CC arc */
-        case 4:                 /* Dwell */
         case 92:                /* Set offset */
-          fprintf(stderr, "UNIMPLEMENTED: G%d\n", (unsigned)word.num);
+          fprintf(stderr, "UNIMPLEMENTED: Line %d: G%d\n", block->real_line, (unsigned)word.num);
+          break;
+
+          /* Ignored */
+        case 4:                 /* Dwell */
           break;
 
         default:
-          fprintf(stderr, "WARNING: Skipping unrecognized G code G%d\n", (unsigned)word.num);
+          fprintf(stderr, "WARNING: Line %d: Skipping unrecognized G code G%d\n", block->real_line, (unsigned)word.num);
           break;
         }
         break;
@@ -155,10 +158,11 @@ void update(gcblock *head) {
 
         /* Ignored words */
       case 'F':
+      case 'P':
         break;
 
       default:
-        fprintf(stderr, "WARNING: Skipping unrecognized word %c\n", word.letter);
+        fprintf(stderr, "WARNING: Line %d: Skipping unrecognized word %c\n", block->real_line, word.letter);
         break;
       }
     }
@@ -182,6 +186,7 @@ void readgcode(int ignored) {
   static gcblock *head = 0, *tail = 0;
   static struct timeval timeout = {0, 0};
   static char done = 0;
+  static unsigned blockidx = 1, real_line = 1;
 
   FD_SET(gcsource, &fdset);
 
@@ -205,6 +210,19 @@ void readgcode(int ignored) {
         size_t i;
         for(i = 0; i < (size_t)bytes; ++i) {
           if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
+            /* Skip empty lines */
+            if(sofar + i + 1 < (size_t)bytes) {
+              switch(gcbuf[sofar + i + 1]) {
+              case '\n':
+                real_line++;
+              case '\r':
+                continue;
+                
+              default:
+                break;
+              }
+            } 
+                
             /* Parse new block */
             gcblock *block = parse_block(gcbuf, sofar + i + 1);
 
@@ -213,6 +231,10 @@ void readgcode(int ignored) {
             memmove(gcbuf, gcbuf + sofar + i + skip, bytes - i);
 
             if(block) {
+              /* Add final metadata */
+              block->index = blockidx++;
+              block->real_line = real_line++;
+              
               /* Append block to block list */
               if(head) {
                 tail->next = block;
@@ -222,7 +244,7 @@ void readgcode(int ignored) {
                 tail = block;
               }
             } else {
-              fprintf(stderr, "WARNING: Got malformed block, ignoring.\n");
+              fprintf(stderr, "WARNING: Line %d: Got malformed block, ignoring.\n", real_line++);
             }
 
             /* Rebuild display list */

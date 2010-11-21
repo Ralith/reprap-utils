@@ -32,6 +32,9 @@ gcblock *parse_block(char *buffer, unsigned len) {
   block->optdelete = 0;
   block->words = NULL;
   block->wordcnt = 0;
+  /* We can't fill these in here */
+  block->index = 0;
+  block->real_line = 0;
 
   /* Check for optional delete */
   if(buffer[i] == '/') {
