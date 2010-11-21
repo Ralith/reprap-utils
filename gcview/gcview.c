@@ -21,7 +21,7 @@
 
 #define FRAME_DELAY 17          /* 1/(17ms) = about 60FPS */
 
-#define MOTION_INCREMENT (M_PI/8)
+#define MOTION_INCREMENT (M_PI/2)
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
@@ -63,7 +63,7 @@ void makerot(GLfloat *matrix, float latitude, float longitude) {
 }
 
 void updatecam() {
-  makerot(camerarot, camera.latitude, camera.longitude);
+  //makerot(camerarot, camera.latitude, camera.longitude);
 }
 
 /* Draw the current state of affairs */
@@ -71,8 +71,10 @@ void draw(void) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
   glLoadIdentity();
-  glLoadMatrixf(camerarot);
+  //glLoadMatrixf(camerarot);
   glTranslatef(0.0f, 0.0f, -camera.radius);
+  glRotatef(-camera.latitude, 1, 0, 0);
+  glRotatef(-camera.longitude, 0, 1, 0);
   glCallList(dlist);
 
   glutSwapBuffers();
@@ -272,13 +274,13 @@ int main(int argc, char** argv) {
   glutReshapeFunc(resize);
   glutSpecialFunc(special_key);
   camerarot = calloc(16, sizeof(GLfloat));
-  makerot(camerarot, 0, 0);
 
   /* Initialize state */
   update(0);
   camera.latitude = 0;
   camera.longitude = 0;
   camera.radius = 6;
+  updatecam();
 
   /* Enter main loop */
   idle(0);
