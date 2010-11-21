@@ -21,7 +21,7 @@
 
 #define FRAME_DELAY 17          /* 1/(17ms) = about 60FPS */
 
-#define MOTION_INCREMENT (M_PI/2)
+#define MOTION_INCREMENT M_PI
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
@@ -103,7 +103,7 @@ void idle(int ignored) {
         exit(EXIT_FAILURE);
       }
       size_t i;
-      for(i = 0; i < bytes; ++i) {
+      for(i = 0; i < (size_t)bytes; ++i) {
         if(gcbuf[sofar + i] == '\r' || gcbuf[sofar + i] == '\n') {
           /* Parse new block */
           gcblock *block = parse_block(gcbuf, sofar + i + 1);
@@ -155,6 +155,19 @@ void resize(int width, int height) {
   glLoadIdentity();
 }
 
+void key(unsigned char key, int x, int y) {
+  switch(key) {
+  case '+':
+  case '=':
+    camera.radius += 1;
+    break;
+
+  case '-':
+    camera.radius -= 1;
+    break;
+  }
+}
+
 void special_key(int key, int x, int y) {
   switch(key) {
   case GLUT_KEY_LEFT:
@@ -183,31 +196,64 @@ void special_key(int key, int x, int y) {
 }
 
 void update(gcblock *head) {
+  struct {
+    float x, y, z;
+  } prev = {0.0, 0.0, 0.0}, curr = {0.0, 0.0, 0.0};
+  char relative;
+  
   if(glIsList(dlist)) {
     glDeleteLists(dlist, 1);
   }
   dlist = glGenLists(1);
-  
   glNewList(dlist, GL_COMPILE);
-  /* Move Left 1.5 Units */
-  /*glLoadIdentity();*/
-  glTranslatef(-1.5f, 0.0f, 0.0f);
 
-  glBegin(GL_TRIANGLES);            /* Drawing Using Triangles */
-  glVertex3f( 0.0f,  1.0f, 0.0f); /* Top */
-  glVertex3f(-1.0f, -1.0f, 0.0f); /* Bottom Left */
-  glVertex3f( 1.0f, -1.0f, 0.0f); /* Bottom Right */
-  glEnd();                           /* Finished Drawing The Triangle */
+  /* Evaluate blocks sequentially */
+  gcblock *block;
+  for(block = head; block != NULL; block = block->next) {
+    /* Evaluate all words in the block */
+    size_t i;
+    for(i = 0; i < block->wordcnt; ++i) {
+      const gcword word = block->words[i];
+      switch(word.letter) {
+      case 'G':
+      case 'g':
+        switch(word.inum) {
+        case 0:
+          glColor3f(1.0, 0.5, 0.0);
+          break;
+        case 1:
+          glColor3f(0.0, 1.0, 0.25);
+        }
+        break;
 
-  /* Move Right 3 Units */
-  glTranslatef(3.0f, 0.0f, 0.0f);
+      case 'X':
+      case 'x':
+        curr.x = (relative ? prev.x : 0) + word.fnum;
+        break;
 
-  glBegin(GL_QUADS);                /* Draw A Quad */
-  glVertex3f(-1.0f,  1.0f, 0.0f); /* Top Left */
-  glVertex3f( 1.0f,  1.0f, 0.0f); /* Top Right */
-  glVertex3f( 1.0f, -1.0f, 0.0f); /* Bottom Right */
-  glVertex3f(-1.0f, -1.0f, 0.0f); /* Bottom Left */
-  glEnd();                           /* Done Drawing The Quad */
+      case 'Y':
+      case 'y':
+        curr.y = (relative ? prev.y : 0) + word.fnum;
+        break;
+
+      case 'Z':
+      case 'z':
+        curr.z = (relative ? prev.z : 0) + word.fnum;
+        break;
+        
+      default:
+        break;
+      }
+    }
+    glBegin(GL_LINES);
+    {
+      glVertex3f(prev.x, prev.y, prev.z);
+      glVertex3f(curr.x, curr.y, curr.z);
+    }
+    glEnd();
+    prev = curr;
+  }
+
   glEndList();
 }
 
@@ -272,6 +318,7 @@ int main(int argc, char** argv) {
 
   /* Prepare for mainloop */
   glutReshapeFunc(resize);
+  glutKeyboardFunc(key);
   glutSpecialFunc(special_key);
   camerarot = calloc(16, sizeof(GLfloat));
 
