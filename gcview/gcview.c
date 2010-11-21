@@ -94,7 +94,7 @@ void update(gcblock *head) {
       switch(word.letter) {
       case 'G':
       case 'g':
-        switch(word.inum) {
+        switch((unsigned)word.num) {
         case 0:                 /* Rapid Positioning */
           if(extruding) {
             glColor3f(1.0, 0.5, 0.0);
@@ -115,18 +115,18 @@ void update(gcblock *head) {
         case 3:                 /* CC arc */
         case 4:                 /* Dwell */
         case 92:                /* Set offset */
-          fprintf(stderr, "UNIMPLEMENTED\n");
+          fprintf(stderr, "UNIMPLEMENTED: G%d\n", (unsigned)word.num);
           break;
 
         default:
-          fprintf(stderr, "WARNING: Skipping unrecognized word G%d\n", word.inum);
+          fprintf(stderr, "WARNING: Skipping unrecognized G code G%d\n", (unsigned)word.num);
           break;
         }
         break;
 
       case 'M':
       case 'm':
-        switch(word.inum) {
+        switch((unsigned)word.num) {
         case 101:
           extruding = 1;
           break;
@@ -140,20 +140,25 @@ void update(gcblock *head) {
 
       case 'X':
       case 'x':
-        curr.x = (relative ? prev.x : 0) + word.fnum + offset.x;
+        curr.x = (relative ? prev.x : 0) + word.num + offset.x;
         break;
 
       case 'Y':
       case 'y':
-        curr.y = (relative ? prev.y : 0) + word.fnum + offset.y;
+        curr.y = (relative ? prev.y : 0) + word.num + offset.y;
         break;
 
       case 'Z':
       case 'z':
-        curr.z = (relative ? prev.z : 0) + word.fnum + offset.z;
+        curr.z = (relative ? prev.z : 0) + word.num + offset.z;
         break;
-        
+
+        /* Ignored words */
+      case 'F':
+        break;
+
       default:
+        fprintf(stderr, "WARNING: Skipping unrecognized word %c\n", word.letter);
         break;
       }
     }

@@ -76,19 +76,9 @@ gcblock *parse_block(char *buffer, unsigned len) {
     /* TODO: Gn.m support */
     {
       char *endptr;
-      switch(block->words[block->wordcnt].letter) {
-      case 'g':
-      case 'G':
-      case 'm':
-      case 'M':
-        block->words[block->wordcnt].inum = strtol(buffer + i, &endptr, 10);
-        break;
-
-      default:
-        block->words[block->wordcnt].fnum = strtof(buffer + i, &endptr);
-        break;
-      }
-
+      
+      block->words[block->wordcnt].num = strtof(buffer + i, &endptr);
+      
       if(endptr == buffer + i) {
         free(block->words);
         free(block);

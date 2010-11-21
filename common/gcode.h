@@ -2,10 +2,7 @@
 
 typedef struct gcword {
   char letter;
-  union {
-    int inum;
-    float fnum;
-  };
+  float num;
 } gcword;
 
 typedef struct gcblock {
@@ -16,5 +13,4 @@ typedef struct gcblock {
   unsigned wordcnt;
 } gcblock;
 
-gcblock *parse_block(char *buffer, unsigned len);
-  
+gcblock *parse_block(char *buffer, unsigned len);  
