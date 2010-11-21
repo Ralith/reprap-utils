@@ -102,6 +102,7 @@ void idle(int ignored) {
             /* Append block to block list */
             if(head) {
               tail->next = block;
+              tail = block;
             } else {
               head = block;
               tail = block;
