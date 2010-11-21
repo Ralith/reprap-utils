@@ -27,7 +27,7 @@ GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
 
-GLfloat *camerarot;
+GLfloat *camtransform;
 
 struct {
   float latitude;
@@ -35,46 +35,32 @@ struct {
   float radius;
 } camera;
 
-void makerot(GLfloat *matrix, float latitude, float longitude) {
-  float cosphi = cos(latitude);
-  float sinphi = sin(latitude);
-  float costheta = cos(longitude);
-  float sintheta = sin(longitude);
+void storexform(GLfloat *matrix, float latitude, float longitude, float radius) {
+  glMatrixMode(GL_MODELVIEW);
+  glPushMatrix();
+  {
+    glLoadIdentity();
+    
+    glTranslatef(0.0f, 0.0f, -camera.radius);
+    glRotatef(-camera.latitude, 1, 0, 0);
+    glRotatef(-camera.longitude, 0, 1, 0);
 
-  matrix[0] = costheta;
-  matrix[1] = 0;
-  matrix[2] = -sintheta;
-  matrix[3] = 0;
-
-  matrix[4] = sinphi * sintheta;
-  matrix[5] = costheta;
-  matrix[6] = sinphi * costheta;
-  matrix[7] = 0;
-
-  matrix[8] = cosphi * sintheta;
-  matrix[9] = -sinphi;
-  matrix[10] = cosphi * costheta;
-  matrix[11] = 0;
-
-  matrix[12] = 0;
-  matrix[13] = 0;
-  matrix[14] = 0;
-  matrix[15] = 0;
+    glGetFloatv(GL_MODELVIEW_MATRIX, matrix);
+  }
+  glPopMatrix();
 }
 
 void updatecam() {
-  //makerot(camerarot, camera.latitude, camera.longitude);
+  storexform(camtransform, camera.latitude, camera.longitude, camera.radius);
 }
 
 /* Draw the current state of affairs */
 void draw(void) {
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
   glLoadIdentity();
-  //glLoadMatrixf(camerarot);
-  glTranslatef(0.0f, 0.0f, -camera.radius);
-  glRotatef(-camera.latitude, 1, 0, 0);
-  glRotatef(-camera.longitude, 0, 1, 0);
+  
+  glLoadMatrixf(camtransform);
+  
   glCallList(dlist);
 
   glutSwapBuffers();
@@ -160,10 +146,12 @@ void key(unsigned char key, int x, int y) {
   case '+':
   case '=':
     camera.radius += 1;
+    updatecam();
     break;
 
   case '-':
     camera.radius -= 1;
+    updatecam();
     break;
   }
 }
@@ -199,7 +187,7 @@ void update(gcblock *head) {
   struct {
     float x, y, z;
   } prev = {0.0, 0.0, 0.0}, curr = {0.0, 0.0, 0.0};
-  char relative;
+  char relative = 0;
   
   if(glIsList(dlist)) {
     glDeleteLists(dlist, 1);
@@ -320,7 +308,7 @@ int main(int argc, char** argv) {
   glutReshapeFunc(resize);
   glutKeyboardFunc(key);
   glutSpecialFunc(special_key);
-  camerarot = calloc(16, sizeof(GLfloat));
+  camtransform = calloc(16, sizeof(GLfloat));
 
   /* Initialize state */
   update(0);
