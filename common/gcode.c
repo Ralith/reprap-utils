@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "gcode.h"
 
@@ -67,7 +68,7 @@ gcblock *parse_block(char *buffer, unsigned len) {
       block->words = realloc(block->words, allocsize * sizeof(gcword));
     }
     
-    block->words[block->wordcnt].letter = buffer[i];
+    block->words[block->wordcnt].letter = toupper(buffer[i]);
     i = next_dark(buffer, len, i + 1);
     if(i == len) {
       free(block->words);
