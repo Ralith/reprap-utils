@@ -14,108 +14,141 @@
 
 #define MOTION_INCREMENT (M_PI/5)
 
-char rerender;                  /* Do we currently need to rerender? */
+char redraw;                    /* Is the view up to date? */
 
 struct {
-    float latitude;
-    float longitude;
-    float radius;
+  float latitude;
+  float longitude;
+  float radius;
 } camera;
 
-/* Render the current state of affairs */
-void render(void) {
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glColor3f(1.0, 1.0, 1.0);   /* set current color to white */
-    glBegin(GL_POLYGON);        /* draw filled triangle */
-    glVertex2i(200,125);        /* specify each vertex of triangle */
-    glVertex2i(100,375);
-    glVertex2i(300,375);
-    glEnd();                    /* OpenGL draws the filled triangle */
-    glutSwapBuffers();
+/* Draw the current state of affairs */
+void draw(void) {
+  glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
 
-    rerender = 0;               /* Image is now up to date */
+  /* Move Left 1.5 Units And Into The Screen 6.0 */
+  glLoadIdentity();
+  glTranslatef( -1.5f, 0.0f, -6.0f );
+
+  glBegin( GL_TRIANGLES );            /* Drawing Using Triangles */
+  glVertex3f(  0.0f,  1.0f, 0.0f ); /* Top */
+  glVertex3f( -1.0f, -1.0f, 0.0f ); /* Bottom Left */
+  glVertex3f(  1.0f, -1.0f, 0.0f ); /* Bottom Right */
+  glEnd( );                           /* Finished Drawing The Triangle */
+
+  /* Move Right 3 Units */
+  glTranslatef( 3.0f, 0.0f, 0.0f );
+
+  glBegin( GL_QUADS );                /* Draw A Quad */
+  glVertex3f( -1.0f,  1.0f, 0.0f ); /* Top Left */
+  glVertex3f(  1.0f,  1.0f, 0.0f ); /* Top Right */
+  glVertex3f(  1.0f, -1.0f, 0.0f ); /* Bottom Right */
+  glVertex3f( -1.0f, -1.0f, 0.0f ); /* Bottom Left */
+  glEnd( );                           /* Done Drawing The Quad */
+
+  glutSwapBuffers();
+
+  redraw = 0;               /* Image is now up to date */
 }
 
 void idle(int ignored) {
-    if(rerender) {
-        render();
-    }
+  if(redraw) {
+    draw();
+  }
     
-    glutTimerFunc(FRAME_DELAY, idle, 0);
+  glutTimerFunc(FRAME_DELAY, idle, 0);
 }
 
 void resize(int width, int height) {
-    rerender = 1;
-    glViewport(0, 0, width, height);
+  GLfloat ratio;
+  if(height == 0) {
+    return;
+  }
+  ratio = (GLfloat)width / (GLfloat)height;
+  glViewport(0, 0, (GLsizei)width, (GLsizei)height);
+
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  gluPerspective(45.0f, ratio, 0.1f, 100.0f);
+
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+  
+  redraw = 1;
 }
 
 void special_key(int key, int x, int y) {
-    switch(key) {
-    case GLUT_KEY_LEFT:
-        camera.longitude -= MOTION_INCREMENT;
-        rerender = 1;
-        break;
+  switch(key) {
+  case GLUT_KEY_LEFT:
+    camera.longitude -= MOTION_INCREMENT;
+    redraw = 1;
+    break;
 
-    case GLUT_KEY_RIGHT:
-        camera.longitude += MOTION_INCREMENT;
-        rerender = 1;
-        break;
+  case GLUT_KEY_RIGHT:
+    camera.longitude += MOTION_INCREMENT;
+    redraw = 1;
+    break;
 
-    case GLUT_KEY_DOWN:
-        camera.latitude -= MOTION_INCREMENT;
-        rerender = 1;
-        break;
+  case GLUT_KEY_DOWN:
+    camera.latitude -= MOTION_INCREMENT;
+    redraw = 1;
+    break;
 
-    case GLUT_KEY_UP:
-        camera.latitude += MOTION_INCREMENT;
-        rerender = 1;
-        break;
+  case GLUT_KEY_UP:
+    camera.latitude += MOTION_INCREMENT;
+    redraw = 1;
+    break;
 
-    default:
-        break;
-    }   
+  default:
+    break;
+  }   
 }
 
 int main(int argc, char** argv) {
-    glutInit(&argc, argv);
+  glutInit(&argc, argv);
 
-    /* TODO: Validate arguments */
+  /* TODO: Validate arguments */
     
-    /* Create window */
-    {
-        glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_MULTISAMPLE);
-        glutInitWindowSize(DEFAULT_W, DEFAULT_H);
+  /* Create window */
+  {
+    glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH | GLUT_MULTISAMPLE);
+    glutInitWindowSize(DEFAULT_W, DEFAULT_H);
 
-        /* Build title string */
-        size_t titlelen = strlen(argv[0]);
-        int i;
-        for(i = 1; i < argc; ++i) {
-            /* Include room for a space */
-            titlelen += 1 + strlen(argv[i]);
-        }
-        char *title = malloc(titlelen);
-        *title = '\0';
-        strcat(title, argv[0]);
-        for(i = 1; i < argc; ++i) {
-            strcat(title, " ");
-            strcat(title, argv[i]);
-        }
-        
-        glutCreateWindow(title);
-        free(title);
+    /* Build title string */
+    size_t titlelen = strlen(argv[0]);
+    int i;
+    for(i = 1; i < argc; ++i) {
+      /* Include room for a space */
+      titlelen += 1 + strlen(argv[i]);
     }
+    char *title = malloc(titlelen);
+    *title = '\0';
+    strcat(title, argv[0]);
+    for(i = 1; i < argc; ++i) {
+      strcat(title, " ");
+      strcat(title, argv[i]);
+    }
+        
+    glutCreateWindow(title);
+    free(title);
+  }
 
 	/* Configure OpenGL */
-	glClearColor(0, 0, 0, 0);
+  glShadeModel( GL_SMOOTH );
+  glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
+  glClearDepth( 1.0f );
+  glEnable( GL_DEPTH_TEST );
+  glDepthFunc( GL_LEQUAL );
+  glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
 
-    /* Prepare for mainloop */
-    glutReshapeFunc(resize);
-    glutSpecialFunc(special_key);
-    rerender = 0;
+  /* Prepare for mainloop */
+  glutReshapeFunc(resize);
+  glutSpecialFunc(special_key);
+  redraw = 0;
 
-    /* Enter main loop */
-    idle(0);
-    glutMainLoop();
+  /* Enter main loop */
+  idle(0);
+  glutMainLoop();
 
 	exit(EXIT_SUCCESS);
 }
