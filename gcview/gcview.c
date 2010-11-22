@@ -265,10 +265,10 @@ void cleanup(void) {
 
 int main(int argc, char** argv) {
   char showfps = 0;
+  char *file = 0;
   /* Handle args */
   {
     int opt;
-    char *path = 0;
     while((opt = getopt(argc, argv, "h?s")) >= 0) {
       switch(opt) {
       case 'h':
@@ -287,7 +287,7 @@ int main(int argc, char** argv) {
     }
     switch(argc - optind) {
     case 1:
-      path = argv[optind];
+      file = argv[optind];
       break;
 
     default:
@@ -296,11 +296,11 @@ int main(int argc, char** argv) {
     {
       /* Work out what we're reading from */
       gcsource = STDIN_FILENO;
-      if(path) {
-        gcsource = open(path, O_RDONLY);
+      if(file) {
+        gcsource = open(file, O_RDONLY);
         atexit(cleanup);
         if(gcsource < 0) {
-          perror(path);
+          perror(file);
           exit(EXIT_FAILURE);
         }
 
@@ -355,9 +355,20 @@ int main(int argc, char** argv) {
       fprintf(stderr, "Failed to set video mode: %s\n", SDL_GetError());
       exit(EXIT_FAILURE);
     }
-    
-    //SDL_WM_SetCaption(title, title);
-    //free(title);
+
+    char *title;
+    if(file) {
+      title = calloc(strlen(argv[0]) + strlen(file) + 2, sizeof(char));
+      strcpy(title, argv[0]);
+      strcat(title, " ");
+      strcat(title, file);
+    } else {
+      title = calloc(strlen(argv[0]) + strlen(" stdin") + 1, sizeof(char));
+      strcpy(title, argv[0]);
+      strcat(title, " stdin");
+    }
+    SDL_WM_SetCaption(title, title);
+    free(title);
   }
 
 	/* Configure OpenGL */
