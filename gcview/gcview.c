@@ -140,9 +140,9 @@ int readgcode(struct timeval timeout) {
           /*   free(block->words); */
           /*   free(block); */
           /* } */
-          return 1;
+        /* return 1; */
         }
-      }
+
       size_t i = sofar;
       size_t block_start = 0;
       const size_t end = sofar+bytes;
