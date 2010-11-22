@@ -11,8 +11,13 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#ifdef APPLE
+#include <OpenGL/gl.h>
+#include <OpenGL/glu.h>
+#else
 #include <GL/gl.h>
 #include <GL/glu.h>
+#endif
 #include <SDL.h>
 
 #include "../common/gcode.h"

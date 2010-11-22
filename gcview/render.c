@@ -1,4 +1,8 @@
+#ifdef APPLE
+#include <OpenGL/gl.h>
+#else
 #include <GL/gl.h>
+#endif
 #include <stdio.h>
 
 #include "render.h"
