@@ -13,6 +13,7 @@ void render_words(gcblock *head) {
   
   /* Evaluate blocks sequentially */
   glBegin(GL_LINE_STRIP);
+  glVertex3f(curr.x, curr.y, curr.z);
   gcblock *block;
   for(block = head; block != NULL; block = block->next) {
     /* Evaluate all words in the block */
