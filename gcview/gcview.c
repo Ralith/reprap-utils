@@ -51,7 +51,7 @@ void storexform(GLfloat *matrix, float latitude, float longitude, float radius) 
     glLoadIdentity();
     
     glTranslatef(0.0f, 0.0f, -radius);
-    glRotatef(-longitude, 0, 1, 0);
+    glRotatef(longitude, 0, 1, 0);
     glRotatef(latitude, 1, 0, 0);
     //glTranslatef(1.0f, 1.0f, 0.0f);
 
@@ -252,23 +252,6 @@ void handlekey(SDL_keysym *key) {
   }
 }
 
-void handlemouse(int button) {
-  switch(button) {
-  case SDL_BUTTON_WHEELUP:
-    camera.radius -= 10;
-    updatecam();
-    break;
-
-  case SDL_BUTTON_WHEELDOWN:
-    camera.radius += 10;
-    updatecam();
-    break;
-
-  default:
-    break;
-  }
-}
-
 void cleanup(void) {
   if(gcsource != STDIN_FILENO) {
     close(gcsource);
@@ -395,6 +378,7 @@ int main(int argc, char** argv) {
   SDL_Event e;
   char done = 0;
   char gcdone = 0;
+  char dragging = 0;
   struct timeval t0, t, dt;
   unsigned frames = 0;
   float fps_elapsed = 0;
@@ -417,8 +401,34 @@ int main(int argc, char** argv) {
         handlekey(&e.key.keysym);
         break;
 
+      case SDL_MOUSEMOTION:
+        if(dragging) {
+          camera.longitude += e.motion.xrel;
+          camera.latitude += e.motion.yrel;
+          updatecam();
+        }
+        break;
+
       case SDL_MOUSEBUTTONDOWN:
-        handlemouse(e.button.button);
+      case SDL_MOUSEBUTTONUP:
+        switch(e.button.button) {
+        case SDL_BUTTON_LEFT:
+          dragging = e.button.state;
+          break;
+          
+        case SDL_BUTTON_WHEELUP:
+          camera.radius -= 10;
+          updatecam();
+          break;
+
+        case SDL_BUTTON_WHEELDOWN:
+          camera.radius += 10;
+          updatecam();
+          break;
+
+        default:
+          break;
+        }
         break;
 
       case SDL_QUIT:
