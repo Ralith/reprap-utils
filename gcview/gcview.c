@@ -373,6 +373,7 @@ int main(int argc, char** argv) {
   camera.longitude = 0;
   camera.radius = 100;
   updatecam();
+  resize(DEFAULT_W, DEFAULT_H);
 
   /* Enter main loop */
   SDL_Event e;
