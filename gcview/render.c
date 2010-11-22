@@ -9,6 +9,7 @@ void render_words(gcblock *head) {
   char relative = 0;
   char moved = 0;
   char statechange = 0;        /* Force line drawing */
+  int lastg;
   
   /* Evaluate blocks sequentially */
   glBegin(GL_LINE_STRIP);
@@ -22,7 +23,8 @@ void render_words(gcblock *head) {
       const gcword word = block->words[i];
       switch(word.letter) {
       case 'G':
-        switch((unsigned)word.num) {
+        lastg = (int)word.num;
+        switch((int)word.num) {
         case 0:                 /* Rapid Positioning */
           if(extruding) {
             glColor3f(1.0, 0.5, 0.0);
@@ -48,24 +50,25 @@ void render_words(gcblock *head) {
 
         case 2:                 /* CW arc */
         case 3:                 /* CC arc */
-          fprintf(stderr, "UNIMPLEMENTED: Line %d: G%d\n", block->real_line, (unsigned)word.num);
+          fprintf(stderr, "UNIMPLEMENTED: Line %d: G%d\n", block->real_line, (int)word.num);
           break;
 
           /* Ignored */
         case 4:                 /* Dwell */
         case 20:                /* Inches (TODO: Scale) */
         case 21:                /* mm */
+        case 28:                /* Home (implemented in axis words) */
         case 92:                /* Set offset */
           break;
 
         default:
-          fprintf(stderr, "WARNING: Line %d: Skipping unrecognized G code G%d\n", block->real_line, (unsigned)word.num);
+          fprintf(stderr, "WARNING: Line %d: Skipping unrecognized G code G%d\n", block->real_line, (int)word.num);
           break;
         }
         break;
 
       case 'M':
-        switch((unsigned)word.num) {
+        switch((int)word.num) {
           /* Extruder motor state */
         case 101:               /* On */
           extruding = 1;
@@ -96,18 +99,57 @@ void render_words(gcblock *head) {
         break;
 
       case 'X':
-        peek.x = (relative ? peek.x : 0) + word.num;
-        moved = 1;
+        switch(lastg) {
+        case 0:
+        case 1:
+          peek.x = (relative ? peek.x : 0) + word.num;
+          moved = 1;
+          break;
+
+        case 28:
+          peek.x = 0;
+          moved = 1;
+          break;
+
+        default:
+          break;
+        }
         break;
 
       case 'Y':
-        peek.y = (relative ? peek.y : 0) + word.num;
-        moved = 1;
+        switch(lastg) {
+        case 0:
+        case 1:
+          peek.y = (relative ? peek.y : 0) + word.num;
+          moved = 1;
+          break;
+
+        case 28:
+          peek.y = 0;
+          moved = 1;
+          break;
+
+        default:
+          break;
+        }
         break;
 
       case 'Z':
-        peek.z = (relative ? peek.z : 0) + word.num;
-        moved = 1;
+        switch(lastg) {
+        case 0:
+        case 1:
+          peek.z = (relative ? peek.z : 0) + word.num;
+          moved = 1;
+          break;
+
+        case 28:
+          peek.z = 0;
+          moved = 1;
+          break;
+
+        default:
+          break;
+        }
         break;
 
         /* Ignored words */
