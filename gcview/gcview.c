@@ -127,6 +127,7 @@ int readgcode(struct timeval timeout) {
         if(needsupdate) {
           update(head);
         }
+        needsupdate = 0;
         if(gcsource != STDIN_FILENO) {
           return 0;
         } /* else { */
@@ -145,8 +146,8 @@ int readgcode(struct timeval timeout) {
           /*   free(block->words); */
           /*   free(block); */
           /* } */
-        /* return 1; */
-        }
+        return 1;
+      }
 
       size_t i = sofar;
       size_t block_start = 0;
