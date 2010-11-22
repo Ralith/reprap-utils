@@ -29,8 +29,8 @@
 
 #define HELP "Usage: gcview [-s] [file]\n" \
   "\t-s\tShow FPS\n" \
-  "\tfile\tFile to read from.  Standard input is used if this is omitted.\n" \
-  "When input is read from stdin, an EOF will trigger a reset to the initial state.\n"
+  "\tfile\tFile to read from.  Standard input is used if this is omitted.\n"
+  //"When input is read from stdin, SIGHUP will trigger a reset to the initial state.\n"
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
@@ -124,22 +124,22 @@ int readgcode(struct timeval timeout) {
         }
         if(gcsource != STDIN_FILENO) {
           return 0;
-        } else {
-          /* Reset state */
-          sofar = 0;
-          blockidx = 1;
-          real_line = 0;
-          needsupdate = 1;
-          head = NULL;
-          tail = NULL;
-          /* Free gcode blocks */
-          gcblock *block, *next;
-          for(block = head; block != NULL; block = next) {
-            next = block->next;
-            free(block->text);
-            free(block->words);
-            free(block);
-          }
+        } /* else { */
+          /* /\* Reset state *\/ */
+          /* sofar = 0; */
+          /* blockidx = 1; */
+          /* real_line = 0; */
+          /* needsupdate = 1; */
+          /* head = NULL; */
+          /* tail = NULL; */
+          /* /\* Free gcode blocks *\/ */
+          /* gcblock *block, *next; */
+          /* for(block = head; block != NULL; block = next) { */
+          /*   next = block->next; */
+          /*   free(block->text); */
+          /*   free(block->words); */
+          /*   free(block); */
+          /* } */
           return 1;
         }
       }
