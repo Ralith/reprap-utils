@@ -29,7 +29,8 @@
 
 #define HELP "Usage: gcview [-s] [file]\n" \
   "\t-s\tShow FPS\n" \
-  "\tfile\tFile to read from.  Standard input is used if this is omitted.\n"
+  "\tfile\tFile to read from.  Standard input is used if this is omitted.\n" \
+  "When input is read from stdin, an EOF will trigger a reset to the initial state.\n"
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
