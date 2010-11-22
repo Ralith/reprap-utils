@@ -232,6 +232,23 @@ void handlekey(SDL_keysym *key) {
   }
 }
 
+void handlemouse(int button) {
+  switch(button) {
+  case SDL_BUTTON_WHEELUP:
+    camera.radius -= 10;
+    updatecam();
+    break;
+
+  case SDL_BUTTON_WHEELDOWN:
+    camera.radius += 10;
+    updatecam();
+    break;
+
+  default:
+    break;
+  }
+}
+
 void cleanup(void) {
   if(gcsource != STDIN_FILENO) {
     close(gcsource);
@@ -378,6 +395,10 @@ int main(int argc, char** argv) {
 
       case SDL_KEYDOWN:
         handlekey(&e.key.keysym);
+        break;
+
+      case SDL_MOUSEBUTTONDOWN:
+        handlemouse(e.button.button);
         break;
 
       case SDL_QUIT:
