@@ -27,6 +27,10 @@
 
 #define VIEWDISTANCE (1000.0f)
 
+#define HELP "Usage: gcview [-s] [file]\n" \
+  "\t-s\tShow FPS\n" \
+  "\tfile\tFile to read from.  Standard input is used if this is omitted.\n"
+
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
@@ -72,21 +76,19 @@ void draw() {
 }
 
 void update(gcblock *head) {
-  point root = {0.0, 0.0, 0.0};
-  
   if(glIsList(dlist)) {
     glDeleteLists(dlist, 1);
   }
   dlist = glGenLists(1);
   glNewList(dlist, GL_COMPILE);
   if(head) {
-    render_words(head, &root);
+    render_words(head);
   }
   glEndList();
 }
 
 int readgcode(struct timeval timeout) {
-  static char gcbuf[GCODE_BLOCKSIZE];
+  static char gcbuf[GCODE_BLOCKSIZE*1024];
   static gcblock *head = 0, *tail = 0;
   static unsigned blockidx = 1, real_line = 0;
   static unsigned sofar = 0;
@@ -237,29 +239,59 @@ void cleanup(void) {
 }
 
 int main(int argc, char** argv) {
+  char showfps = 0;
+  /* Handle args */
   {
-    /* Work out what we're reading from */
-    gcsource = STDIN_FILENO;
-    atexit(cleanup);
-    if(argc > 1) {
-      gcsource = open(argv[1], O_RDONLY);
-      if(gcsource < 0) {
-        perror(argv[1]);
-        exit(EXIT_FAILURE);
-      }
+    int opt;
+    char *path = 0;
+    while((opt = getopt(argc, argv, "h?s")) >= 0) {
+      switch(opt) {
+      case 'h':
+      case '?':
+        printf("%s", HELP);
+        exit(EXIT_SUCCESS);
+        break;
 
-      int flags;
-      if (-1 == (flags = fcntl(gcsource, F_GETFL, 0))) {
-        flags = 0;
-      }
-      if(-1 == fcntl(gcsource, F_SETFL, flags | O_NONBLOCK)) {
-        fprintf(stderr, "Failed to enter non-blocking mode: ");
-        perror("fcntl");
-        exit(EXIT_FAILURE);
+      case 's':
+        showfps = 1;
+        break;
+
+      default:
+        break;
       }
     }
-    /* Init select data */
-    FD_ZERO(&fdset);
+    switch(argc - optind) {
+    case 1:
+      path = argv[optind];
+      break;
+
+    default:
+      break;
+    }
+    {
+      /* Work out what we're reading from */
+      gcsource = STDIN_FILENO;
+      if(path) {
+        gcsource = open(path, O_RDONLY);
+        atexit(cleanup);
+        if(gcsource < 0) {
+          perror(path);
+          exit(EXIT_FAILURE);
+        }
+
+        int flags;
+        if (-1 == (flags = fcntl(gcsource, F_GETFL, 0))) {
+          flags = 0;
+        }
+        if(-1 == fcntl(gcsource, F_SETFL, flags | O_NONBLOCK)) {
+          fprintf(stderr, "Failed to enter non-blocking mode: ");
+          perror("fcntl");
+          exit(EXIT_FAILURE);
+        }
+      }
+      /* Init select data */
+      FD_ZERO(&fdset);
+    }
   }
 
   /* Init SDL */
@@ -268,7 +300,7 @@ int main(int argc, char** argv) {
     exit(EXIT_FAILURE);
   }
   atexit(SDL_Quit);
-  SDL_EnableKeyRepeat(1, SDL_DEFAULT_REPEAT_INTERVAL);
+  SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_INTERVAL, SDL_DEFAULT_REPEAT_INTERVAL);
     
   /* Create window */
   int vflags;
@@ -289,38 +321,28 @@ int main(int argc, char** argv) {
       | (vinfo->blit_hw ? SDL_HWACCEL : 0);
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    /* TODO: Check for AA support (OpenGL extension test?) */
+    /*SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+      SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 4);*/
 
     surface = SDL_SetVideoMode(DEFAULT_W, DEFAULT_H, 16, vflags);
     if(!surface) {
       fprintf(stderr, "Failed to set video mode: %s\n", SDL_GetError());
       exit(EXIT_FAILURE);
     }
-
-    /* Build title string */
-    size_t titlelen = strlen(argv[0]);
-    int i;
-    for(i = 1; i < argc; ++i) {
-      /* Include room for a space */
-      titlelen += 1 + strlen(argv[i]);
-    }
-    char *title = malloc(titlelen);
-    *title = '\0';
-    strcat(title, "gcview");
-    for(i = 1; i < argc; ++i) {
-      strcat(title, " ");
-      strcat(title, argv[i]);
-    }
-    SDL_WM_SetCaption(title, title);
-    free(title);
+    
+    //SDL_WM_SetCaption(title, title);
+    //free(title);
   }
 
 	/* Configure OpenGL */
-  glShadeModel( GL_SMOOTH );
-  glClearColor( 0.0f, 0.0f, 0.0f, 0.0f );
-  glClearDepth( 1.0f );
-  glEnable( GL_DEPTH_TEST );
-  glDepthFunc( GL_LEQUAL );
-  glHint( GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST );
+  glShadeModel(GL_FLAT);
+  glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+  glClearDepth(1.0f);
+  glEnable(GL_DEPTH_TEST);
+  /*glEnable(GL_MULTISAMPLE);*/
+  glDepthFunc(GL_LEQUAL);
+  glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 
   /* Prepare for mainloop */
   camtransform = calloc(16, sizeof(GLfloat));
@@ -337,6 +359,8 @@ int main(int argc, char** argv) {
   char done = 0;
   char gcdone = 0;
   struct timeval t0, t, dt;
+  unsigned frames = 0;
+  float fps_elapsed = 0;
   while(!done) {
     dt.tv_sec = 0;
     dt.tv_usec = 0;
@@ -369,6 +393,18 @@ int main(int argc, char** argv) {
       dt.tv_usec = t.tv_usec - t0.tv_usec;
     }
     draw();
+    ++frames;
+    if(showfps) {
+      gettimeofday(&t, NULL);
+      dt.tv_sec = t.tv_sec - t0.tv_sec;
+      dt.tv_usec = t.tv_usec - t0.tv_usec;
+      fps_elapsed += (dt.tv_usec / 1000000.0) + dt.tv_sec;
+      if(frames >= 30) {
+        printf("FPS: %f\n", ((float)frames)/fps_elapsed);
+        frames = 0;
+        fps_elapsed = 0;
+      }
+    }
   }
 
 	exit(EXIT_SUCCESS);

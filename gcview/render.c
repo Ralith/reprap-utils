@@ -3,13 +3,16 @@
 
 #include "render.h"
 
-void render_words(gcblock *head, point *curr) {
-  point prev = *curr, offset = {0.0, 0.0, 0.0};
+void render_words(gcblock *head) {
+  point curr = {0.0, 0.0, 0.0},
+    prev = {0.0, 0.0, 0.0},
+    offset = {0.0, 0.0, 0.0};
   char extruding = 0;
   char relative = 0;
   char moved = 0;
   
   /* Evaluate blocks sequentially */
+  glBegin(GL_LINE_STRIP);
   gcblock *block;
   for(block = head; block != NULL; block = block->next) {
     /* Evaluate all words in the block */
@@ -85,17 +88,17 @@ void render_words(gcblock *head, point *curr) {
         break;
 
       case 'X':
-        curr->x = (relative ? prev.x : 0) + word.num + offset.x;
+        curr.x = (relative ? prev.x : 0) + word.num + offset.x;
         moved = 1;
         break;
 
       case 'Y':
-        curr->y = (relative ? prev.y : 0) + word.num + offset.y;
+        curr.y = (relative ? prev.y : 0) + word.num + offset.y;
         moved = 1;
         break;
 
       case 'Z':
-        curr->z = (relative ? prev.z : 0) + word.num + offset.z;
+        curr.z = (relative ? prev.z : 0) + word.num + offset.z;
         moved = 1;
         break;
 
@@ -113,13 +116,9 @@ void render_words(gcblock *head, point *curr) {
       }
     }
     if(moved) {
-      glBegin(GL_LINES);
-      {
-        glVertex3f(prev.x, prev.y, prev.z);
-        glVertex3f(curr->x, curr->y, curr->z);
-      }
-      glEnd();
-      prev = *curr;
+      glVertex3f(curr.x, curr.y, curr.z);
+      prev = curr;
     }
   }
+  glEnd();
 }
