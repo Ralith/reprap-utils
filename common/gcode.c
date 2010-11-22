@@ -96,3 +96,15 @@ gcblock *parse_block(char *buffer, unsigned len) {
 
   return block;
 }
+
+float dot(const point a, const point b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+float length(const point a) {
+  return sqrt(dot(a, a));
+}
+
+float angle(const point a, const point b) {
+  return acosf(dot(a, b) / (length(a) * length(b)));
+}

@@ -4,15 +4,15 @@
 #include "render.h"
 
 void render_words(gcblock *head) {
-  point curr = {0.0, 0.0, 0.0},
-    prev = {0.0, 0.0, 0.0},
-    offset = {0.0, 0.0, 0.0};
+  point curr = {0.0, 0.0, 0.0}, next = {0.0, 0.0, 0.0}, peek = {0.0, 0.0, 0.0};
   char extruding = 0;
   char relative = 0;
   char moved = 0;
+  char statechange = 0;        /* Force line drawing */
   
   /* Evaluate blocks sequentially */
   glBegin(GL_LINE_STRIP);
+  /*glVertex3f(peek.x, peek.y, peek.z);*/
   glVertex3f(curr.x, curr.y, curr.z);
   gcblock *block;
   for(block = head; block != NULL; block = block->next) {
@@ -66,13 +66,15 @@ void render_words(gcblock *head) {
 
       case 'M':
         switch((unsigned)word.num) {
-          /* Motor state */
+          /* Extruder motor state */
         case 101:               /* On */
           extruding = 1;
+          statechange = 1;
           break;
         case 102:               /* Off */
         case 103:               /* Reverse */
           extruding = 0;
+          statechange = 1;
           break;
 
           /* Ignored */
@@ -89,17 +91,17 @@ void render_words(gcblock *head) {
         break;
 
       case 'X':
-        curr.x = (relative ? prev.x : 0) + word.num + offset.x;
+        peek.x = (relative ? peek.x : 0) + word.num;
         moved = 1;
         break;
 
       case 'Y':
-        curr.y = (relative ? prev.y : 0) + word.num + offset.y;
+        peek.y = (relative ? peek.y : 0) + word.num;
         moved = 1;
         break;
 
       case 'Z':
-        curr.z = (relative ? prev.z : 0) + word.num + offset.z;
+        peek.z = (relative ? peek.z : 0) + word.num;
         moved = 1;
         break;
 
@@ -116,10 +118,16 @@ void render_words(gcblock *head) {
         break;
       }
     }
+    /* Contiguous line simplification; interferes with coloring */
+    /* const point nextdelta = {next.x - peek.x, next.y - peek.y, next.z - peek.z}; */
+    /* const point currdelta = {curr.x - next.x, curr.y - next.y, curr.z - next.z}; */
+    /* const float dtheta = angle(currdelta, nextdelta); */
     if(moved) {
-      glVertex3f(curr.x, curr.y, curr.z);
-      prev = curr;
+      glVertex3f(next.x, next.y, next.z);
+      curr = next;
     }
+    next = peek;
   }
+  glVertex3f(peek.x, peek.y, peek.z);
   glEnd();
 }

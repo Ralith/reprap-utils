@@ -1,11 +1,19 @@
 #ifndef _GCODE_H_
 #define _GCODE_H_
 
+#include <math.h>
+
 #define GCODE_BLOCKSIZE (256 + 1)
 
 typedef struct {
   float x, y, z;
 } point;
+
+float dot(const point a, const point b);
+
+float length(const point a);
+
+float angle(const point a, const point b);
 
 typedef struct gcword {
   char letter;
