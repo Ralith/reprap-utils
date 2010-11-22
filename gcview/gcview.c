@@ -28,15 +28,13 @@
 #define VIEWDISTANCE (1000.0f)
 
 #define HELP "Usage: gcview [-p] [-s us] [file]\n" \
-  "\t-p\tShow FPS\n" \
-  "\t-s ms\t'Simulate' at us microseconds per mm\n" \
+  "\t-s\tShow FPS\n" \
   "\tfile\tFile to read from.  Standard input is used if this is omitted.\n"
   //"When input is read from stdin, SIGHUP will trigger a reset to the initial state.\n"
 
 GLuint dlist;                   /* Display list pointer */
 int gcsource;                   /* FD we're reading gcode from */
 fd_set fdset;
-unsigned long simspeed;         /* us/mm */
 
 GLfloat *camtransform;
 
@@ -262,12 +260,11 @@ void cleanup(void) {
 
 int main(int argc, char** argv) {
   char showfps = 0;
-  simspeed = 0;
   /* Handle args */
   {
     int opt;
     char *path = 0;
-    while((opt = getopt(argc, argv, "h?ps:")) >= 0) {
+    while((opt = getopt(argc, argv, "h?s")) >= 0) {
       switch(opt) {
       case 'h':
       case '?':
@@ -275,12 +272,8 @@ int main(int argc, char** argv) {
         exit(EXIT_SUCCESS);
         break;
 
-      case 'p':
-        showfps = 1;
-        break;
-
       case 's':
-        simspeed = strtol(optarg, NULL, 10);
+        showfps = 1;
         break;
 
       default:
