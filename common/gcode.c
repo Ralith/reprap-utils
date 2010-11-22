@@ -62,6 +62,9 @@ gcblock *parse_block(char *buffer, unsigned len) {
         return block;
       }
     }
+    if(buffer[i] == ';') {
+      return block;
+    }
       
     if(block->wordcnt == allocsize) {
       allocsize = 2*(allocsize ? allocsize : 2);

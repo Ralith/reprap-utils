@@ -80,8 +80,13 @@ void render_words(gcblock *head) {
           /* Ignored */
         case 1:                 /* Interactive extruder test */
         case 6:                 /* Wait for warmup */
-        case 104:               /* Set temp (TODO: color?) */
+        case 104:               /* Set temp (slow) (TODO: color?) */
+        case 105:               /* Get temp */
+        case 106:               /* Fan on (color?) */
+        case 107:               /* Fan off (color?) */
         case 108:               /* Set speed */
+        case 109:               /* Set temp (slow) (color?) */
+        case 113:               /* Extruder PWM */
           break;
 
         default:
@@ -111,6 +116,7 @@ void render_words(gcblock *head) {
       case 'S':                 /* Speed (TODO: consider coloring) */
       case 'R':                 /* Param to M108 meaning what? */
       case 'T':                 /* Param to M6 (wait for warmup), others? */
+      case 'E':                 /* Extrude length */
         break;
 
       default:
