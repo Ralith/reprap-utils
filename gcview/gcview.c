@@ -27,7 +27,7 @@
 
 #define VIEWDISTANCE (1000.0f)
 
-#define HELP "Usage: gcview [-p] [-s us] [file]\n" \
+#define HELP "Usage: gcview [-s] [file]\n" \
   "\t-s\tShow FPS\n" \
   "\tfile\tFile to read from.  Standard input is used if this is omitted.\n"
   //"When input is read from stdin, SIGHUP will trigger a reset to the initial state.\n"
