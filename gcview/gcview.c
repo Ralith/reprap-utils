@@ -121,7 +121,26 @@ int readgcode(struct timeval timeout) {
         if(needsupdate) {
           update(head);
         }
-        return 0;
+        if(gcsource != STDIN_FILENO) {
+          return 0;
+        } else {
+          /* Reset state */
+          sofar = 0;
+          blockidx = 1;
+          real_line = 0;
+          needsupdate = 1;
+          head = NULL;
+          tail = NULL;
+          /* Free gcode blocks */
+          gcblock *block, *next;
+          for(block = head; block != NULL; block = next) {
+            next = block->next;
+            free(block->text);
+            free(block->words);
+            free(block);
+          }
+          return 1;
+        }
       }
       size_t i = sofar;
       size_t block_start = 0;
