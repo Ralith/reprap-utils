@@ -15,7 +15,7 @@
 #define STR(x) #x
 
 #define DEFAULT_SPEED 19200
-#define READBUF_SIZE GCODE_BLOCKSIZE
+#define READBUF_SIZE 256
 #define INPUT_BLOCK_TERMINATOR "\n"
 
 #define HELP \
