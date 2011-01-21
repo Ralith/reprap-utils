@@ -15,7 +15,7 @@
 #define STR(x) #x
 
 #define DEFAULT_SPEED 19200
-#define READBUF_SIZE 2048
+#define READBUF_SIZE GCODE_BLOCKSIZE
 #define INPUT_BLOCK_TERMINATOR "\n"
 
 #define HELP \
@@ -37,10 +37,10 @@ void usage(char* name) {
 /* Allows atexit to be used for guaranteed cleanup */
 rr_dev device = NULL;
 int input = STDIN_FILENO;
-void cleanup() 
-{
+void cleanup() {
 	if(device) {
 		rr_close(device);
+    rr_free(device);
 	}
 	if(input != STDIN_FILENO) {
 		close(input);
@@ -55,9 +55,13 @@ void onrecv(rr_dev dev, void *data, const char *reply, size_t len) {
   write(STDOUT_FILENO, reply, len);
 }
 
-void onreply(rr_dev dev, void *confirmed, rr_reply reply, float f) {
+void onreply(rr_dev dev, void *unconfirmed, rr_reply reply, float f) {
   if(reply == RR_OK) {
-    ++*(unsigned*)confirmed;
+    if(*(unsigned*)unconfirmed == 0) {
+      fprintf(stderr, "WARNING: Ignoring extra receipt confirmation!\n");
+    } else {
+      --*(unsigned*)unconfirmed;
+    }
   }
 }
 
@@ -66,12 +70,14 @@ void onerr(rr_dev dev, void *data, rr_error err, const char *source, size_t len)
   case RR_E_UNCACHED_RESEND:
     fprintf(stderr, "Device requested we resend a line older than we cache!\n"
             "Aborting.\n");
+    /* TODO: Halt extruder/heater on abort */
     exit(EXIT_FAILURE);
     break;
 
   case RR_E_HARDWARE_FAULT:
     fprintf(stderr, "HARDWARE FAULT!\n"
             "Aborting.\n");
+    /* TODO: Halt extruder/heater on abort */
     exit(EXIT_FAILURE);
     break;
 
@@ -105,8 +111,8 @@ int main(int argc, char** argv)
 	int strip = 0;
 	int interactive = isatty(STDIN_FILENO);
   int buffered = 0;
-  unsigned confirmed = 0;
-	unsigned max_unconfirmed = 0;
+  unsigned unconfirmed = 0;
+	unsigned max_unconfirmed = 1;
 	{
 		int opt;
 		while ((opt = getopt(argc, argv, "h?5qvcs:u:f:")) >= 0) {
@@ -183,7 +189,7 @@ int main(int argc, char** argv)
   device = rr_create(protocol,
                      (verbose ? &onsend : NULL), NULL,
                      (quiet ? NULL : &onrecv), NULL,
-                     &onreply, &confirmed,
+                     &onreply, &unconfirmed,
                      &onerr, NULL,
                      &update_buffered, &buffered,
                      128);
@@ -225,7 +231,11 @@ int main(int argc, char** argv)
   while(1) {
     FD_ZERO(&readable);
     FD_ZERO(&writable);
-    FD_SET(input, &readable);
+    if(unconfirmed < max_unconfirmed) {
+      /* Only look for input when we're confident the machine's
+       * keeping up */
+      FD_SET(input, &readable);
+    }
     FD_SET(devfd, &readable);
     /* Only look for writability if there's data to be written */
     if(buffered) {
@@ -241,10 +251,10 @@ int main(int argc, char** argv)
         continue;
       } else {
         perror("Waiting on I/O failed");
-        fprintf(stderr, "Flushing buffers...");
         rr_flush(device);
-        fprintf(stderr, " done\n");
+        fprintf(stderr, "Buffers flushed\n");
         fprintf(stderr, "Aborting.\n");
+        /* TODO: Halt extruder/heater on abort */
         exit(EXIT_FAILURE);
       }
     } else if(result > 0) {
@@ -254,6 +264,7 @@ int main(int argc, char** argv)
         if(result < 0) {
           perror("Reading from device failed");
           fprintf(stderr, "Aborting.\n");
+          /* TODO: Halt extruder/heater on abort */
           exit(EXIT_FAILURE);
         }
       }
@@ -272,18 +283,31 @@ int main(int argc, char** argv)
         } while(result < 0 && errno == EINTR);
         if(result < 0) {
           perror("Reading from input failed");
-          fprintf(stderr, "Flushing buffers...");
           result = rr_flush(device);
           if(result < 0) {
-            perror(" failed");
+            perror("Flushing output buffers failed");
           } else {
-            fprintf(stderr, " done\n");
+            fprintf(stderr, "Output buffers flushed.\n");
           }
           fprintf(stderr, "Aborting.\n");
+          /* TODO: Halt extruder/heater on abort */
           exit(EXIT_FAILURE);
+        } else if(result == 0) {
+          /* Got EOF */
+          if(verbose) {
+            printf("Got EOF!\n");
+          }
+          result = rr_flush(device);
+          if(result < 0) {
+            perror("Flushing output buffers failed");
+          } else if(verbose) {
+            printf("Output buffers flushed.\n");
+          }
+          break;
         }
 
         /* Scan for terminator */
+        /* TODO: Don't over-enqueue when multiple blocks are read at once  */
         const size_t termlen = strlen(INPUT_BLOCK_TERMINATOR);
         size_t start = 0;
         bytesread += result;
@@ -292,6 +316,7 @@ int main(int argc, char** argv)
           if(!strncmp(readbuf + scan, INPUT_BLOCK_TERMINATOR, termlen)) {
             /* Send off complete input block and continue scanning */
             rr_enqueue(device, RR_PRIO_NORMAL, NULL, readbuf + start, scan);
+            ++unconfirmed;
             scan += termlen;
             start = scan;
           }
@@ -302,9 +327,8 @@ int main(int argc, char** argv)
     }
   }
 
-	if(verbose) {
-		printf("Successfully completed!\n");
-	}
+  rr_close(device);
+  rr_free(device);
 
 	exit(EXIT_SUCCESS);
 }
