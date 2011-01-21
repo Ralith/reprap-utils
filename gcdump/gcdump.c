@@ -20,7 +20,7 @@
 	"\t-?\n" \
 	"\t-h\t\tDisplay this help message.\n" \
 	"\t-q\t\tQuiet mode; no output unless an error occurs.\n" \
-	"\t-v\t\tVerbose: Prints all serial I/O, instead of just received data.\n" \
+	"\t-v\t\tVerbose: Prints debug info and all serial I/O, instead of just received data.\n" \
 	"\t-s speed\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n" \
   "\t-5\t\tUse 5D protocol (default is 3D)\n" \
 	"\t-c\t\tFilter out non-meaningful chars. May stress noncompliant gcode interpreters.\n" \
@@ -38,13 +38,51 @@ int input = STDIN_FILENO;
 void cleanup() 
 {
 	if(device) {
-    rr_flush(device);
 		rr_close(device);
 	}
 	if(input != STDIN_FILENO) {
 		close(input);
 	}
 }
+
+void onsend(rr_dev dev, void *data, void *blockdata, const char *line, size_t len) {
+  write(STDOUT_FILENO, line, len);
+}
+
+void onrecv(rr_dev dev, void *data, const char *reply, size_t len) {
+  write(STDOUT_FILENO, reply, len);
+}
+
+void onerr(rr_dev dev, void *data, rr_error err, const char *source, size_t len) {
+  switch(err) {
+  case RR_E_UNCACHED_RESEND:
+    fprintf(stderr, "Device requested we resend a line older than we cache!\n"
+            "Aborting.\n");
+    exit(EXIT_FAILURE);
+    break;
+
+  case RR_E_HARDWARE_FAULT:
+    fprintf(stderr, "HARDWARE FAULT!\n"
+            "Aborting.\n");
+    exit(EXIT_FAILURE);
+    break;
+
+  case RR_E_UNKNOWN_REPLY:
+    fprintf(stderr, "Warning:\t Recieved an unknown reply from the device.\n"
+            "\t Your firmware is not supported or there is an error in libreprap.\n"
+            "\t Please report this!\n");
+    break;
+
+  default:
+    fprintf(stderr, "libreprap and gcdump are out of sync.  Please report this!\n");
+    break;
+  }
+}
+
+void update_buffered(rr_dev device, void *state, char value) {
+  *(int*)state = value;
+}
+
 int main(int argc, char** argv)
 {
 	atexit(cleanup);
@@ -54,10 +92,11 @@ int main(int argc, char** argv)
 	char *devpath = NULL;
 	char *filepath = NULL;
   rr_proto protocol = RR_PROTO_SIMPLE;
-	int noisy = 1;
+	int quiet = 1;
 	int verbose = 0;
 	int strip = 0;
 	int interactive = isatty(STDIN_FILENO);
+  int buffered = 0;
 	unsigned max_unconfirmed = 0;
 	{
 		int opt;
@@ -76,7 +115,7 @@ int main(int argc, char** argv)
 				break;
 
 			case 'q':			/* Quiet */
-				noisy = 0;
+				quiet = 1;
 				break;
 
 			case 'v':			/* Verbose */
@@ -126,11 +165,19 @@ int main(int argc, char** argv)
 			filepath = "-";
 		}
 	}
-	if(noisy) {
+	if(verbose) {
 		printf("Serial port:\t%s\n", devpath);
 		printf("Line speed:\t%ld\n", speed);
 		printf("Gcode file:\t%s\n", filepath);
 	}
+
+  device = rr_create(protocol,
+                     (verbose ? &onsend : NULL), NULL,
+                     (quiet ? NULL : &onrecv), NULL,
+                     NULL, NULL,
+                     &onerr, NULL,
+                     &update_buffered, &buffered,
+                     32);
 
 	/* Connect to machine */
 	if(rr_open(device, devpath, speed) < 0) {
@@ -141,7 +188,7 @@ int main(int argc, char** argv)
 
   /* Open input */
 	if(strncmp("-", filepath, 1) == 0) {
-		if(noisy) {
+		if(verbose) {
 			printf("Will read gcode from standard input");
 			if(interactive) {
 				printf("; enter Ctrl-D (EOF) to finish.");
@@ -159,7 +206,9 @@ int main(int argc, char** argv)
 		interactive = 0;
 	}
 
-	if(noisy) {
+  /* Mainloop */
+
+	if(verbose) {
 		printf("Successfully completed!\n");
 	}
 
