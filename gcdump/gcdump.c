@@ -15,6 +15,8 @@
 #define STR(x) #x
 
 #define DEFAULT_SPEED 19200
+#define READBUF_SIZE 2048
+#define INPUT_BLOCK_TERMINATOR "\n"
 
 #define HELP \
 	"\t-?\n" \
@@ -51,6 +53,12 @@ void onsend(rr_dev dev, void *data, void *blockdata, const char *line, size_t le
 
 void onrecv(rr_dev dev, void *data, const char *reply, size_t len) {
   write(STDOUT_FILENO, reply, len);
+}
+
+void onreply(rr_dev dev, void *confirmed, rr_reply reply, float f) {
+  if(reply == RR_OK) {
+    ++*(unsigned*)confirmed;
+  }
 }
 
 void onerr(rr_dev dev, void *data, rr_error err, const char *source, size_t len) {
@@ -97,6 +105,7 @@ int main(int argc, char** argv)
 	int strip = 0;
 	int interactive = isatty(STDIN_FILENO);
   int buffered = 0;
+  unsigned confirmed = 0;
 	unsigned max_unconfirmed = 0;
 	{
 		int opt;
@@ -174,10 +183,10 @@ int main(int argc, char** argv)
   device = rr_create(protocol,
                      (verbose ? &onsend : NULL), NULL,
                      (quiet ? NULL : &onrecv), NULL,
-                     NULL, NULL,
+                     &onreply, &confirmed,
                      &onerr, NULL,
                      &update_buffered, &buffered,
-                     32);
+                     128);
 
 	/* Connect to machine */
 	if(rr_open(device, devpath, speed) < 0) {
@@ -207,6 +216,91 @@ int main(int argc, char** argv)
 	}
 
   /* Mainloop */
+  fd_set readable, writable;
+  int result;
+  int devfd = rr_dev_fd(device);
+  int highfd = devfd > input ? devfd : input;
+  char readbuf[READBUF_SIZE];
+  size_t bytesread = 0;
+  while(1) {
+    FD_ZERO(&readable);
+    FD_ZERO(&writable);
+    FD_SET(input, &readable);
+    FD_SET(devfd, &readable);
+    /* Only look for writability if there's data to be written */
+    if(buffered) {
+      FD_SET(devfd, &writable);
+    }
+    
+    result = select(highfd + 1, &readable, &writable, NULL, NULL);
+    if(result < 0) {
+      /* Handle error */
+      if(errno == EINTR) {
+        /* select was interrupted before any of the selected events
+         * occurred and before the timeout interval expired. */
+        continue;
+      } else {
+        perror("Waiting on I/O failed");
+        fprintf(stderr, "Flushing buffers...");
+        rr_flush(device);
+        fprintf(stderr, " done\n");
+        fprintf(stderr, "Aborting.\n");
+        exit(EXIT_FAILURE);
+      }
+    } else if(result > 0) {
+      /* Perform I/O */
+      if(FD_ISSET(devfd, &readable)) {
+        result = rr_handle_readable(device);
+        if(result < 0) {
+          perror("Reading from device failed");
+          fprintf(stderr, "Aborting.\n");
+          exit(EXIT_FAILURE);
+        }
+      }
+      if(FD_ISSET(devfd, &writable)) {
+        result = rr_handle_writable(device);
+        if(result < 0) {
+          perror("Writing to device failed");
+          fprintf(stderr, "Aborting.\n");
+          exit(EXIT_FAILURE);
+        }
+      }
+      if(FD_ISSET(input, &readable)) {
+        /* Read input */
+        do {
+          result = read(input, readbuf + bytesread, READBUF_SIZE - bytesread);
+        } while(result < 0 && errno == EINTR);
+        if(result < 0) {
+          perror("Reading from input failed");
+          fprintf(stderr, "Flushing buffers...");
+          result = rr_flush(device);
+          if(result < 0) {
+            perror(" failed");
+          } else {
+            fprintf(stderr, " done\n");
+          }
+          fprintf(stderr, "Aborting.\n");
+          exit(EXIT_FAILURE);
+        }
+
+        /* Scan for terminator */
+        const size_t termlen = strlen(INPUT_BLOCK_TERMINATOR);
+        size_t start = 0;
+        bytesread += result;
+        size_t scan = (bytesread > termlen) ? bytesread - termlen : 0;
+        for(; scan < (bytesread - termlen); ++scan) {
+          if(!strncmp(readbuf + scan, INPUT_BLOCK_TERMINATOR, termlen)) {
+            /* Send off complete input block and continue scanning */
+            rr_enqueue(device, RR_PRIO_NORMAL, NULL, readbuf + start, scan);
+            scan += termlen;
+            start = scan;
+          }
+        }
+        /* Move incomplete input block to beginning of buffer */
+        memmove(readbuf, readbuf+start, bytesread - start);
+      }
+    }
+  }
 
 	if(verbose) {
 		printf("Successfully completed!\n");
