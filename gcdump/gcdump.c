@@ -327,8 +327,5 @@ int main(int argc, char** argv)
     }
   }
 
-  rr_close(device);
-  rr_free(device);
-
 	exit(EXIT_SUCCESS);
 }
