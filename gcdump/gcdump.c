@@ -49,10 +49,12 @@ void cleanup() {
 
 void onsend(rr_dev dev, void *data, void *blockdata, const char *line, size_t len) {
   write(STDOUT_FILENO, line, len);
+  write(STDOUT_FILENO, "\n", 1);
 }
 
 void onrecv(rr_dev dev, void *data, const char *reply, size_t len) {
   write(STDOUT_FILENO, reply, len);
+  write(STDOUT_FILENO, "\n", 1);
 }
 
 void onreply(rr_dev dev, void *unconfirmed, rr_reply reply, float f) {
@@ -82,9 +84,10 @@ void onerr(rr_dev dev, void *data, rr_error err, const char *source, size_t len)
     break;
 
   case RR_E_UNKNOWN_REPLY:
-    fprintf(stderr, "Warning:\t Recieved an unknown reply from the device.\n"
+    /* Do this once libreprap matures more */
+    /*fprintf(stderr, "Warning: Recieved an unknown reply from the device.\n"
             "\t Your firmware is not supported or there is an error in libreprap.\n"
-            "\t Please report this!\n");
+            "\t Please report this!\n");*/
     break;
 
   default:
@@ -106,7 +109,7 @@ int main(int argc, char** argv)
 	char *devpath = NULL;
 	char *filepath = NULL;
   rr_proto protocol = RR_PROTO_SIMPLE;
-	int quiet = 1;
+	int quiet = 0;
 	int verbose = 0;
 	int strip = 0;
 	int interactive = isatty(STDIN_FILENO);
@@ -162,13 +165,20 @@ int main(int argc, char** argv)
 			break;
 
 		case 0:
-			devpath = rr_guess_port();
+    {
+      /* Yes, this leaks a little, but only once. */
+      char **ports = rr_enumerate_ports();
+      size_t i;
+      for(i = 0; ports[i] != NULL; ++i) {
+        devpath = ports[i];
+      }
 			if(devpath == NULL) {
 				fprintf(stderr, "Unable to autodetect a serial port.  Please specify one explicitly.\n");
 				usage(argv[0]);
 				exit(EXIT_FAILURE);
 			}
 			break;
+    }
 
 		default:
 			fprintf(stderr, "Too many arguments!\n");
@@ -312,7 +322,7 @@ int main(int argc, char** argv)
         size_t start = 0;
         bytesread += result;
         size_t scan = (bytesread > termlen) ? bytesread - termlen : 0;
-        for(; scan < (bytesread - termlen); ++scan) {
+        for(; scan <= (bytesread - termlen); ++scan) {
           if(!strncmp(readbuf + scan, INPUT_BLOCK_TERMINATOR, termlen)) {
             /* Send off complete input block and continue scanning */
             rr_enqueue(device, RR_PRIO_NORMAL, NULL, readbuf + start, scan);
@@ -323,6 +333,7 @@ int main(int argc, char** argv)
         }
         /* Move incomplete input block to beginning of buffer */
         memmove(readbuf, readbuf+start, bytesread - start);
+        bytesread -= start;
       }
     }
   }
