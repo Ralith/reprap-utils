@@ -19,19 +19,19 @@
 #define INPUT_BLOCK_TERMINATOR "\n"
 
 #define HELP \
+  "\t-p <3|5|t>\t\tUse <3D|5D|tonokip> protocol (default is 3D)\n" \
 	"\t-?\n" \
 	"\t-h\t\tDisplay this help message.\n" \
 	"\t-q\t\tQuiet mode; no output unless an error occurs.\n" \
 	"\t-v\t\tVerbose: Prints debug info and all serial I/O, instead of just received data.\n" \
 	"\t-s speed\tSerial line speed.  Defaults to " STR(DEFAULT_SPEED) ".\n" \
-  "\t-5\t\tUse 5D protocol (default is 3D)\n" \
 	"\t-c\t\tFilter out non-meaningful chars. May stress noncompliant gcode interpreters.\n" \
 	"\t-u number\tMaximum number of messages to send without receipt confirmation.  Unsafe, but necessary for certain broken firmware.\n" \
   "\t-f file\t\tFile to dump.  If no gcode file is specified, or the file specified is -, gcode is read from the standard input.\n"
 
 
 void usage(char* name) {
-	fprintf(stderr, "Usage: %s [-s <speed>] [-5] [-q] [-v] [-c] [-u <number>] [-f <gcode file>] [port]\n", name);
+	fprintf(stderr, "Usage: %s [-s <speed>] [-p <3|5|t>] [-q] [-v] [-c] [-u <number>] [-f <gcode file>] [port]\n", name);
 }
 
 /* Allows atexit to be used for guaranteed cleanup */
@@ -115,11 +115,33 @@ int main(int argc, char** argv)
 	int interactive = isatty(STDIN_FILENO);
   int buffered = 0;
   unsigned unconfirmed = 0;
-	unsigned max_unconfirmed = 1;
+  /* Lots of firmware seems to not 'ok' the first message */
+	unsigned max_unconfirmed = 2;
 	{
 		int opt;
-		while ((opt = getopt(argc, argv, "h?5qvcs:u:f:")) >= 0) {
+		while ((opt = getopt(argc, argv, "h?p:qvcs:u:f:")) >= 0) {
 			switch(opt) {
+      case 'p':                 /* Protocol */
+        switch(*optarg) {
+        case '3':
+          protocol = RR_PROTO_SIMPLE;
+          break;
+          
+        case '5':
+          protocol = RR_PROTO_FIVED;
+          break;
+
+        case 't':
+          protocol = RR_PROTO_TONOKIP;
+          break;
+
+        default:
+          fprintf(stderr, "ERROR: Unknown protocol identifier: %c", *optarg);
+          usage(argv[0]);
+          exit(EXIT_FAILURE);
+        }
+        break;
+        
 			case 's':			/* Speed */
 				speed = strtol(optarg, NULL, 10);
 				break;
